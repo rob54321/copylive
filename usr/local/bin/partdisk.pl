@@ -11,7 +11,7 @@ sub usage {
 	print "-D size of LINUXLIVE partition in GB default is 8GB fat32\n";
 	print "-W (size in GB) default is 10GB persistence partition\n";
 	print "-M size of MCTREC partition in GB default is 8GB fat32\n";
-	print "-h display this usage";
+	print "-h display this usage\n";
 	exit 0;
 }
 
