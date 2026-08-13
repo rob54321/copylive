@@ -142,5 +142,5 @@ $writablesize = $opt_W if $opt_W;
 # set size for microsoft media creation tool 
 $mctrecsize = $opt_M if $opt_M;
 
-partitiondisk($opt_D, $writablesize, $mctrecsize);
+partitiondisk($linuxlivesize, $writablesize, $mctrecsize);
 
