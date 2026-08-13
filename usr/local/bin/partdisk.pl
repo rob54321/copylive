@@ -4,11 +4,13 @@ use strict;
 use warnings;
 use Getopt::Std;
 
-our ($opt_D, $opt_W, $opt_M);
+our ($opt_h, $opt_D, $opt_W, $opt_M);
 
 sub usage {
 	print "-D size of LINUXLIVE partition in GB default is 8GB fat32\n";
 	print "-W (size in GB) default is 10GB persistence partition\n";
+	print "-M size of MCTREC partition in GB default is 8GB fat32\n";
+	print "-h display this usage";
 	exit 0;
 }
 
@@ -125,7 +127,11 @@ my $linuxlivesize = 8;
 my $writablesize = 10;
 my $mctrecsize = 8;
 
-getopts('D:W:M:');
+getopts('D:W:M:h');
+
+# display help and exit if -h given
+usage () if $opt_h;
+
 # set linuxlive size
 $linuxlivesize = $opt_D if $opt_D;
 
