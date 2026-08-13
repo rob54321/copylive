@@ -1,0 +1,8 @@
+Package: copylive
+Version: 1.0.0
+Architecture: all
+Maintainer: Robert Key robkey@mighty.co.za
+Depends: subversion, git
+Section: myown
+Priority: optional
+Description: copylive.pl builds a live system by copying the cdrom to LINUXLIVE partition
