@@ -1,5 +1,6 @@
 #!/usr/bin/perl
-
+# this script partitions a disk for use in a linux live system.
+# see description below
 use strict;
 use warnings;
 use Getopt::Std;
