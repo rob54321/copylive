@@ -1,0 +1,27 @@
+#!/bin/bash
+# this script builds an ubuntu live system with macrium reflect and microsoft media creattion tool
+# on a bootable usb disk. The grub menu is used.
+# all macrium and microsoft media creation files are to found in /mnt/debhome/livesystem/MACRIUM and MCTREC resp.
+# options for this script are
+# -p partition disk
+# -D size of linuxlive parition, default is 8GB   -- for partdisk.pl
+# -W size of writable partition, default is 10GB  -- for partdisk.pl
+# -M size of MCTREC partition, default is 8GB     -- for partdisk.pl
+# -i iso image to use
+# -h a help message
+
+# set partition disk to false, unless -p or -D or -W or -M passed
+PARTDISK="false"
+
+while getopts i:p:D:W:M: opt
+do
+	case ${opt} in
+		i) ISOIMAGE="${OPTARG}";;
+		p) PARTDISK="true";;
+		D) LLIVESIZE="${OPTARG}"; PARTDISK="true";;
+		W) WSIZE="${OPTARG}"; PARTDISK="true";;
+		M) MCTSIZE="${OPTARG}"; PARTDISK="true";;
+		h) usage;;
+		\?) usage;;
+	esac
+done
