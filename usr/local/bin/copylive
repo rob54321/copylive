@@ -66,3 +66,4 @@ test -f "${ISOIMAGE}" || exitonerror 1 "${ISOIMAGE}: no such file";
 if test "${PARTDISK}" = "true"; then
 	/usr/local/bin/partdisk.pl -D "${LLIVESIZE}" -W "${WSIZE}" -M "${MCTSIZE}"
 	exitonerror $? "partdisk.pl gave an error ... exiting"
+fi

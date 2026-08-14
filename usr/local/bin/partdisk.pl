@@ -7,17 +7,6 @@ use Getopt::Std;
 
 our ($opt_h, $opt_D, $opt_W, $opt_M);
 
-# the rc code is passed as first parameter, no exit on 0, exit on 1, 2, 3..
-# second parameter is the error string
-exitonerror() {
-	# test rc code
-	if test $1 -ne 0; then
-		# display error string
-		echo "$2"
-		exit 1;
-	fi
-}
-
 # help message
 sub usage {
 	print "-D size of LINUXLIVE partition in GB default is 8GB fat32\n";
