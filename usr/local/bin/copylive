@@ -38,6 +38,10 @@ usage() {
 
 # set partition disk to false, unless -p or -D or -W or -M passed
 PARTDISK="false"
+# default values for partdisk.pl in GB
+LLIVESIZE=8;
+WSIZE=10;
+MCTSIZE=8;
 
 while getopts i:pD:W:M:h opt
 do
@@ -57,3 +61,8 @@ done
 
 # check iso image exists
 test -f "${ISOIMAGE}" || exitonerror 1 "${ISOIMAGE}: no such file";
+
+# if -p or -D or -W or -M given , partition the disk
+if test "${PARTDISK}" = "true"; then
+	/usr/local/bin/partdisk.pl -D "${LLIVESIZE}" -W "${WSIZE}" -M "${MCTSIZE}"
+	exitonerror $? "partdisk.pl gave an error ... exiting"
