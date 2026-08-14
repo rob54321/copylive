@@ -67,3 +67,15 @@ if test "${PARTDISK}" = "true"; then
 	/usr/local/bin/partdisk.pl -D "${LLIVESIZE}" -W "${WSIZE}" -M "${MCTSIZE}"
 	exitonerror $? "partdisk.pl gave an error ... exiting"
 fi
+
+# mount the cdrom
+# make the directory if necessary
+if test ! -d /mnt/cdrom; then
+	mkdir /mnt/cdrom
+	exitonerror $? "Could not make directory /mnt/cdrom"
+fi
+
+mount "${ISOIMAGE}" /mnt/cdrom -o ro
+exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom"
+
+# rem
