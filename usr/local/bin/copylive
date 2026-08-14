@@ -10,10 +10,36 @@
 # -i iso image to use
 # -h a help message
 
+# the rc code is passed as first parameter, no exit on 0, exit on 1, 2, 3..
+# second parameter is the error string
+exitonerror() {
+	# test rc code
+	if test $1 -ne 0; then
+		# display error string
+		echo "$2"
+		exit 1;
+	fi
+}
+
+
+# usage function
+usage() {
+	echo "-i iso image path to use";
+	echo "-p partition disk with default parameters";
+	echo "-D size in GB of LINUXLIVE partition, default = 8GB";
+	echo "-W size in GB of writable partition, default = 10GB";
+	echo "-M size in GB of MCTREC partition, default = 8GB";
+	exit 0;
+}
+
+#################################################################
+# main entry
+#################################################################
+
 # set partition disk to false, unless -p or -D or -W or -M passed
 PARTDISK="false"
 
-while getopts i:p:D:W:M: opt
+while getopts i:pD:W:M:h opt
 do
 	case ${opt} in
 		i) ISOIMAGE="${OPTARG}";;
@@ -25,3 +51,9 @@ do
 		\?) usage;;
 	esac
 done
+
+# testing
+# echo "${ISOIMAGE}: ${PARTDISK}, ${LLIVESIZE}, ${WSIZE} , ${MCTSIZE}";
+
+# check iso image exists
+test -f "${ISOIMAGE}" || exitonerror 1 "${ISOIMAGE}: no such file";
