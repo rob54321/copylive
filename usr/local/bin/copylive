@@ -180,6 +180,23 @@ fi" > /root/cdrom/boot/grub/grub.cfg
 # /mnt/debhome/livesystem/MACRIUM and /mnt/debhome/livesystem/MCTREC
 # to /mnt/MCTREC and /mnt/LINUXLIVE.
 # un mount /mnt/MCTREC and /mnt/LINUXLIVE
+# for macrium
+test -d /mnt/MACRIUM || mkdir /mnt/MACRIUM
+mount -L LINUXLIVE /mnt/LINUXLIVE
+exitonerror $? "Could not mount /mnt/LINUXLIVE"
+
+# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
+cp -dR -v -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
+exitonerror $? "Could not copy MACRIUM files to /mnt/LINUXLIVE"
+
+# for mctrec
+test -d /mnt/MCTREC || mkdir /mnt/MCTREC
+mount -L MCTREC /mnt/MCTREC
+exitonerror $? "Could not mount /mnt/MCTREC"
+# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
+cp -dR -v -T /mnt/debhome/livesystem/MCTREC /mnt/MCTREC/
+exitonerror $? "Could not copy MCTREC files to /mnt/MCTREC"
+
 
 # install grub to the correct device
 # device is in /root/.device which was written by partdisk.pl
