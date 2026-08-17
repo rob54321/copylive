@@ -173,7 +173,7 @@ menuentry 'Boot from next volume' {
 menuentry 'UEFI Firmware Settings' {
     fwsetup
 }
-fi" > /root/boot/grub/grub.cfg
+fi" > /root/cdrom/boot/grub/grub.cfg
 
 # mount MCTREC and LINUXLIVE partitions and
 # copy files for macrium and mctrec from 
