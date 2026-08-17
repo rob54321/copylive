@@ -20,7 +20,19 @@ exitonerror() {
 		exit 1;
 	fi
 }
+mountcopypermissions() {
+	mount "$1" /mnt/cdrom -o ro
+	exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom"
 
+	cp -dRv /mnt/cdrom /root/
+	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
+	
+	# set file and directory permissions
+	find /root/cdrom -type f -exec chmod a+x {} \;
+	find /root/cdrom -type d -exec chmod 755 {} \;
+	umount /mnt/cdrom
+	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
+}
 
 # usage function
 usage() {
@@ -75,7 +87,99 @@ if test ! -d /mnt/cdrom; then
 	exitonerror $? "Could not make directory /mnt/cdrom"
 fi
 
-mount "${ISOIMAGE}" /mnt/cdrom -o ro
-exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom"
+# mount the cdrom for coyping files to /root/cdrom
+# what to do if /root/cdrom exists?
+# prompt if it should be deleted.
+# if deleted then recreate it.
+# else do not create it.
+# check if /root/cdrom exists
+if test -d /root/cdrom; then
+	# prompt to delete
+	read -t 20 -p "/root/cdrom exists: delete it? (yes/no) default no: " ANSWER
+	if test "${ANSWER}" = "yes"; then
+		# delete /root/cdrom
+		rm -rf /root/cdrom
+		mountcopypermissions "${ISOIMAGE}"
+	fi
+else
+	# /root/cdrom does not exist
+	# mount , copy, set permissions
+	mountcopypermissions "${ISOIMAGE}"
+fi
 
-# rem
+
+# backup original grub
+mv -v /root/cdrom/boot/grub/grub.cfg /root/cdrom/boot/grub/grub.cfg.original
+
+# copy grub.cfg /root/cdrom/boot/grub/grub.cfg
+echo "set timeout=30
+
+loadfont unicode
+
+set menu_color_normal=white/blue
+set menu_color_highlight=red/white
+
+menuentry \"Try or Install Ubuntu Cinnamon\" {
+    set gfxpayload=keep
+
+	insmod part_gpt
+	insmod fat
+	if [ x\$feature_platform_search_hint = xy ]; then
+	  search --no-floppy --fs-uuid --set=root  AED6-434E
+	else
+	  search --no-floppy --fs-uuid --set=root AED6-434E
+	fi
+
+    linux  /casper/vmlinuz  --- username=robert hostname=live persistent persistent-path=/casper/ noprompt
+    initrd /casper/initrd
+}
+menuentry \"Ubuntu Cinnamon (safe graphics)\" {
+    set gfxpayload=keep
+    linux  /casper/vmlinuz nomodeset  --- quiet splash
+    initrd /casper/initrd
+}
+menuentry \"Macrium Reflect rescue \" {
+	insmod part_gpt
+	insmod fat
+	if [ x\$feature_platform_search_hint = xy ]; then
+	  search --no-floppy --fs-uuid --set=root  AED6-434E
+	else
+	  search --no-floppy --fs-uuid --set=root AED6-434E
+	fi
+	chainloader /bootmgfw.efi
+	#chainloader /EFI/Boot/bootx64.efi
+}
+menuentry \"Windows Media Creation Tool Recovery (Read the instructions on the next screen)\" {
+	echo \"You can use shift F10 for an administrator console\"
+	echo \"install.esd is in sources directory\"
+	echo \"You can hit escape to exit this message\"
+	sleep -v -i 60
+	
+	insmod part_gpt
+	insmod fat
+	if [ x\$feature_platform_search_hint = xy ]; then
+	  search --no-floppy --fs-uuid --set=root  2222-2222
+	else
+	  search --no-floppy --fs-uuid --set=root 2222-2222
+	fi
+	chainloader /bootmgfw.efi
+}
+
+grub_platform
+if [ \"\$grub_platform\" = \"efi\" ]; then
+menuentry 'Boot from next volume' {
+    exit 1
+}
+menuentry 'UEFI Firmware Settings' {
+    fwsetup
+}
+fi" > /root/boot/grub/grub.cfg
+
+# mount MCTREC and LINUXLIVE partitions and
+# copy files for macrium and mctrec from 
+# /mnt/debhome/livesystem/MACRIUM and /mnt/debhome/livesystem/MCTREC
+# to /mnt/MCTREC and /mnt/LINUXLIVE.
+# un mount /mnt/MCTREC and /mnt/LINUXLIVE
+
+# install grub to the correct device
+# device is in /root/.device which was written by partdisk.pl
