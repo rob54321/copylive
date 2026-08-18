@@ -46,14 +46,6 @@ sub partitiondisk {
 	my $device = <STDIN>;
 	chomp($device);
 	
-	# write device to /root/.device for copy-live to use
-	# delete old file first if it exists
-	unlink "/root/.device";
-	
-	# for the installation of grub
-	open FH, ">", "/root/.device";
-	print FH "$device\n";
-
 	# show the device to check
 	print "\n######################################################\n";
 	$rc = system("parted -s $device print");

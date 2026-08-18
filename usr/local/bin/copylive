@@ -20,98 +20,58 @@ exitonerror() {
 		exit 1;
 	fi
 }
-mountcopypermissions() {
-	mount "$1" /mnt/cdrom -o ro
-	exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom"
 
-	cp -dRv /mnt/cdrom /root/
-	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
+# getdevice gets the device that LINUXLIVE is on.
+# this function returns the device of form /dev/sda
+# or none if device was not found.
+# the device is written to /tmp/device.txt so that
+# it can be passed to back to bash
+getdevice () {
+	# call a perl function to get the LINUXLIVE device
+	perl -e 'use strict; use warnings; do {
+										my @list = `lsblk -o PATH,LABEL`;
+										chomp(@list);
+										# for each item in list
+										foreach my $line (@list) {
+											# if line contains LINUXLIVE get device path
+											if ($line =~ /LINUXLIVE/) {
+												# line = /dev/sda3    label
+												# search for partition name first
+												$line =~ s/\s+.*$//;
+												# line is of form /dev/sda12
+												# remove digits to end of line
+												$line =~ s/\d+.*$//;
+												# write device to /tmp/device.txt
+												# for bash script
+												unlink "/tmp/device.txt";
+												open (FH, ">", "/tmp/device.txt") or die "Could not open file: $!\n";
+												print FH "$line";
+												close FH;
+											} else {
+												# no LINUXLIVE found
+												# write none to /tmp/device.txt
+												unlink "/tmp/device.txt";
+												open (FH, ">", "/tmp/device.txt") or die "Could not open file: $!\n";
+												print FH "none";
+												close FH;
+											}
+										}
+									}'
+	# get the device from the file
+	# or none if not found
+	# cannot return a string in bash.
+	# DEVICE is a global variable
+	DEVICE=`cat /tmp/device.txt`
+	echo "device is [${DEVICE}]"
 	
-	# set file and directory permissions
-	find /root/cdrom -type f -exec chmod a+x {} \;
-	find /root/cdrom -type d -exec chmod 755 {} \;
-	umount /mnt/cdrom
-	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
 }
+# function to copy grub.cfg to /root/cdrom/boot/grub/grub.cfg
+# parameters passed: none
+copygrub() {
+	# backup original grub
+	mv -v /root/cdrom/boot/grub/grub.cfg /root/cdrom/boot/grub/grub.cfg.original
 
-# usage function
-usage() {
-	echo "-i iso image path to use";
-	echo "-p partition disk with default parameters";
-	echo "-D size in GB of LINUXLIVE partition, default = 8GB";
-	echo "-W size in GB of writable partition, default = 10GB";
-	echo "-M size in GB of MCTREC partition, default = 8GB";
-	exit 0;
-}
-
-#################################################################
-# main entry
-#################################################################
-
-# set partition disk to false, unless -p or -D or -W or -M passed
-PARTDISK="false"
-# default values for partdisk.pl in GB
-LLIVESIZE=8;
-WSIZE=10;
-MCTSIZE=8;
-
-while getopts i:pD:W:M:h opt
-do
-	case ${opt} in
-		i) ISOIMAGE="${OPTARG}";;
-		p) PARTDISK="true";;
-		D) LLIVESIZE="${OPTARG}"; PARTDISK="true";;
-		W) WSIZE="${OPTARG}"; PARTDISK="true";;
-		M) MCTSIZE="${OPTARG}"; PARTDISK="true";;
-		h) usage;;
-		\?) usage;;
-	esac
-done
-
-# testing
-# echo "${ISOIMAGE}: ${PARTDISK}, ${LLIVESIZE}, ${WSIZE} , ${MCTSIZE}";
-
-# check iso image exists
-test -f "${ISOIMAGE}" || exitonerror 1 "${ISOIMAGE}: no such file";
-
-# if -p or -D or -W or -M given , partition the disk
-if test "${PARTDISK}" = "true"; then
-	/usr/local/bin/partdisk.pl -D "${LLIVESIZE}" -W "${WSIZE}" -M "${MCTSIZE}"
-	exitonerror $? "partdisk.pl gave an error ... exiting"
-fi
-
-# mount the cdrom
-# make the directory if necessary
-if test ! -d /mnt/cdrom; then
-	mkdir /mnt/cdrom
-	exitonerror $? "Could not make directory /mnt/cdrom"
-fi
-
-# mount the cdrom for coyping files to /root/cdrom
-# what to do if /root/cdrom exists?
-# prompt if it should be deleted.
-# if deleted then recreate it.
-# else do not create it.
-# check if /root/cdrom exists
-if test -d /root/cdrom; then
-	# prompt to delete
-	read -t 20 -p "/root/cdrom exists: delete it? (yes/no) default no: " ANSWER
-	if test "${ANSWER}" = "yes"; then
-		# delete /root/cdrom
-		rm -rf /root/cdrom
-		mountcopypermissions "${ISOIMAGE}"
-	fi
-else
-	# /root/cdrom does not exist
-	# mount , copy, set permissions
-	mountcopypermissions "${ISOIMAGE}"
-fi
-
-
-# backup original grub
-mv -v /root/cdrom/boot/grub/grub.cfg /root/cdrom/boot/grub/grub.cfg.original
-
-# copy grub.cfg /root/cdrom/boot/grub/grub.cfg
+	# copy grub.cfg /root/cdrom/boot/grub/grub.cfg
 echo "set timeout=30
 
 loadfont unicode
@@ -174,29 +134,162 @@ menuentry 'UEFI Firmware Settings' {
     fwsetup
 }
 fi" > /root/cdrom/boot/grub/grub.cfg
+}
 
-# mount MCTREC and LINUXLIVE partitions and
-# copy files for macrium and mctrec from 
-# /mnt/debhome/livesystem/MACRIUM and /mnt/debhome/livesystem/MCTREC
-# to /mnt/MCTREC and /mnt/LINUXLIVE.
-# un mount /mnt/MCTREC and /mnt/LINUXLIVE
-# for macrium
-test -d /mnt/MACRIUM || mkdir /mnt/MACRIUM
-mount -L LINUXLIVE /mnt/LINUXLIVE
-exitonerror $? "Could not mount /mnt/LINUXLIVE"
+# function to copy MCTREC, MACRIUM and 
+# LINUXLIVE files to the hard disk. Partitions are mounted
+# and unmounted.
+copyfiles () {
+	# mount MCTREC and LINUXLIVE partitions and
+	# copy files for macrium and mctrec from 
+	# /mnt/debhome/livesystem/MACRIUM and /mnt/debhome/livesystem/MCTREC
+	# to /mnt/MCTREC and /mnt/LINUXLIVE.
+	# un mount /mnt/MCTREC and /mnt/LINUXLIVE
+	# NOTE: MACRIUM files are copied to LINUXLIVE before the LINUX live files.
 
-# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
-cp -dR -v -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
-exitonerror $? "Could not copy MACRIUM files to /mnt/LINUXLIVE"
+	# parameters passed:
+	# 1 full source path
+	# 2 label MACRIUM or MCTREC or LINUXLIVE for file type
+	 
+	test -d "/mnt/$2" || mkdir "/mnt/$2"
+	mount -L "$2" "/mnt/$2"
+	exitonerror $? "Could not mount /mnt/$2"
 
-# for mctrec
-test -d /mnt/MCTREC || mkdir /mnt/MCTREC
-mount -L MCTREC /mnt/MCTREC
-exitonerror $? "Could not mount /mnt/MCTREC"
-# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
-cp -dR -v -T /mnt/debhome/livesystem/MCTREC /mnt/MCTREC/
-exitonerror $? "Could not copy MCTREC files to /mnt/MCTREC"
+	# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
+	cp -dR -v -T "/mnt/$1" "/mnt/$2"
+	exitonerror $? "Could not copy $1 files to /mnt/$2"
+	
+	# umount device which must be in fstab
+	umount "/mnt/$2"
+	exitonerror $? "Could not umount /mnt/$2"
+}
 
+# function to mount cdrom, copy files
+# to /root/cdrom and set the file permissions
+
+mountcopypermissions() {
+	mount "$1" /mnt/cdrom -o ro
+	exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom"
+
+	cp -dRv /mnt/cdrom /root/
+	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
+	
+	# set file and directory permissions
+	find /root/cdrom -type f -exec chmod a+w {} \;
+	find /root/cdrom -type d -exec chmod 755 {} \;
+	umount /mnt/cdrom
+	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
+	
+	# copy grub.cfg to /root/cdrom/boot/grub.cfg
+	copygrub
+}
+
+# usage function
+usage() {
+	echo "-c isoimage : create /root/cdrom with iso image";
+	echo "-p partition disk with default parameters";
+	echo "-D size in GB of LINUXLIVE partition, default = 8GB";
+	echo "-W size in GB of writable partition, default = 10GB";
+	echo "-M size in GB of MCTREC partition, default = 8GB";
+	exit 0;
+}
+
+#################################################################
+# main entry
+#################################################################
+
+# set partition disk to false, unless -p or -D or -W or -M passed
+PARTDISK="false"
+# default values for partdisk.pl in GB
+LLIVESIZE=8;
+WSIZE=10;
+MCTSIZE=8;
+# default values for switches
+ISOIMAGE="none"
+CPMACRIUM="false"
+CPMCTREC="false"
+
+# source path for MACRIUM and MCTREC files.
+MSOURCE="/mnt/debhome/livesystem"
+
+while getopts c:pD:W:M:mth opt
+do
+	case ${opt} in
+		c) ISOIMAGE="${OPTARG}";;
+		p) PARTDISK="true";;
+		D) LLIVESIZE="${OPTARG}"; PARTDISK="true";;
+		W) WSIZE="${OPTARG}"; PARTDISK="true";;
+		M) MCTSIZE="${OPTARG}"; PARTDISK="true";;
+		m) CPMACRIUM="true";;
+		t) CPMCTREC="true";;
+		h) usage;;
+		\?) usage;;
+	esac
+done
+
+# testing
+# echo "${ISOIMAGE}: ${PARTDISK}, ${LLIVESIZE}, ${WSIZE} , ${MCTSIZE}";
+
+# if -c given, create /root/cdrom else /root/cdrom must already exist
+if test "${ISOIMAGE}" != "none"; then
+	# check iso image exists
+	test -f "${ISOIMAGE}" || exitonerror 1 "${ISOIMAGE}: no such file";
+
+	# mount the cdrom
+	# make the directory if necessary
+	if test ! -d /mnt/cdrom; then
+		mkdir /mnt/cdrom
+		exitonerror $? "Could not make directory /mnt/cdrom"
+	fi
+
+	# mount the cdrom for coyping files to /root/cdrom
+	# what to do if /root/cdrom exists?
+	# prompt if it should be deleted.
+	# if deleted then recreate it.
+	# else do not create it.
+	# check if /root/cdrom exists
+	if test -d /root/cdrom; then
+		# prompt to delete
+		read -t 20 -p "/root/cdrom exists: delete it? (yes/no) default no: " ANSWER
+		if test "${ANSWER}" = "yes"; then
+			# delete /root/cdrom
+			rm -rf /root/cdrom
+			mountcopypermissions "${ISOIMAGE}"
+		fi
+	else
+		# /root/cdrom does not exist
+		# mount , copy, set permissions
+		mountcopypermissions "${ISOIMAGE}"
+	fi
+
+fi
+
+# if -p or -D or -W or -M given , partition the disk
+if test "${PARTDISK}" = "true"; then
+	/usr/local/bin/partdisk.pl -D "${LLIVESIZE}" -W "${WSIZE}" -M "${MCTSIZE}"
+	exitonerror $? "partdisk.pl gave an error ... exiting"
+fi
+
+# copy files for MACRIUM if -m given
+test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "LINUXLIVE"
+
+# for mctrec if -t given
+test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "MCTREC"
+
+# for LINUXLIVE files unconditionaly
+copyfiles "/root/cdrom" "LINUXLIVE"
 
 # install grub to the correct device
 # device is in /root/.device which was written by partdisk.pl
+# get the device, if device not found, none is returned
+getdevice
+
+if test "${DEVICE}" != "none"; then
+	# the LINUXLIVE DEVICE was found
+	# install grub
+	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
+	exitonerror $? "Error installing grub"
+else
+	# LINUXLIVE device was not found
+	echo "LINUXLIVE device not found, could not install grub"
+fi
