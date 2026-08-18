@@ -187,6 +187,8 @@ mountcopypermissions() {
 # usage function
 usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
+	echo "-m copy MACRIUM files to LINUXLIVE partition";
+	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
 	echo "-D size in GB of LINUXLIVE partition, default = 8GB";
 	echo "-W size in GB of writable partition, default = 10GB";
