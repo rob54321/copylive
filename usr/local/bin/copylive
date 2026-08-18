@@ -187,6 +187,7 @@ mountcopypermissions() {
 # usage function
 usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
+	echo "-i install grub"
 	echo "-m copy MACRIUM files to LINUXLIVE partition";
 	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
@@ -210,13 +211,15 @@ MCTSIZE=8;
 ISOIMAGE="none"
 CPMACRIUM="false"
 CPMCTREC="false"
+INSTALLGRUB="false"
 
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts c:pD:W:M:mth opt
+while getopts ic:pD:W:M:mth opt
 do
 	case ${opt} in
+		i) INSTALLGRUB="true";;
 		c) ISOIMAGE="${OPTARG}";;
 		p) PARTDISK="true";;
 		D) LLIVESIZE="${OPTARG}"; PARTDISK="true";;
@@ -284,14 +287,16 @@ copyfiles "/root/cdrom" "LINUXLIVE"
 # install grub to the correct device
 # device is in /root/.device which was written by partdisk.pl
 # get the device, if device not found, none is returned
-getdevice
+if test "${INSTALLGRUB}" = "true"; then
+	getdevice
 
-if test "${DEVICE}" != "none"; then
-	# the LINUXLIVE DEVICE was found
-	# install grub
-	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
-	exitonerror $? "Error installing grub"
-else
-	# LINUXLIVE device was not found
-	echo "LINUXLIVE device not found, could not install grub"
+	if test "${DEVICE}" != "none"; then
+		# the LINUXLIVE DEVICE was found
+		# install grub
+		grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
+		exitonerror $? "Error installing grub"
+	else
+		# LINUXLIVE device was not found
+		echo "LINUXLIVE device not found, could not install grub"
+	fi
 fi
