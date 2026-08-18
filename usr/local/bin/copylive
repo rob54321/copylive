@@ -160,6 +160,10 @@ copyfiles () {
 	mount -L "$2" "/mnt/$2"
 	exitonerror $? "Could not mount /mnt/$2"
 
+	# links cannot be copied to a fat32 filesystem
+	# delete all links
+	find "$1" -type l -exec rm -v {} \;
+
 	# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
 	cp -dR -v -T "$1" "/mnt/$2"
 	exitonerror $? "Could not copy $1 files to /mnt/$2"
