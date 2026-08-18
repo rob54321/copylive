@@ -156,7 +156,7 @@ copyfiles () {
 	exitonerror $? "Could not mount /mnt/$2"
 
 	# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
-	cp -dR -v -T "/mnt/$1" "/mnt/$2"
+	cp -dR -v -T "$1" "/mnt/$2"
 	exitonerror $? "Could not copy $1 files to /mnt/$2"
 	
 	# umount device which must be in fstab
@@ -281,13 +281,13 @@ test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "LINUXLIVE"
 # for mctrec if -t given
 test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "MCTREC"
 
-# for LINUXLIVE files unconditionaly
-copyfiles "/root/cdrom" "LINUXLIVE"
-
 # install grub to the correct device
 # device is in /root/.device which was written by partdisk.pl
 # get the device, if device not found, none is returned
 if test "${INSTALLGRUB}" = "true"; then
+	# copy cdrom files to LINUXLIVE
+	copyfiles "/root/cdrom" "LINUXLIVE"
+
 	getdevice
 
 	if test "${DEVICE}" != "none"; then
