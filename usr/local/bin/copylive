@@ -29,6 +29,9 @@ exitonerror() {
 getdevice () {
 	# call a perl function to get the LINUXLIVE device
 	perl -e 'use strict; use warnings; do {
+										# delete /tmp/device.txt
+										unlink "/tmp/device.txt";
+
 										my @list = `lsblk -o PATH,LABEL`;
 										chomp(@list);
 										# for each item in list
@@ -47,13 +50,7 @@ getdevice () {
 												open (FH, ">", "/tmp/device.txt") or die "Could not open file: $!\n";
 												print FH "$line";
 												close FH;
-											} else {
-												# no LINUXLIVE found
-												# write none to /tmp/device.txt
-												unlink "/tmp/device.txt";
-												open (FH, ">", "/tmp/device.txt") or die "Could not open file: $!\n";
-												print FH "none";
-												close FH;
+												last;
 											}
 										}
 									}'
@@ -61,7 +58,15 @@ getdevice () {
 	# or none if not found
 	# cannot return a string in bash.
 	# DEVICE is a global variable
-	DEVICE=`cat /tmp/device.txt`
+	# if there is no file /tmp/device.txt
+	# then LINUXLIVE was not found
+	if test -f "/tmp/device.txt"; then
+		# LINUXLIVE was found
+		DEVICE=`cat /tmp/device.txt`
+	else
+		# LINUXLIVE was not found
+		DEVICE="none"
+	fi
 	echo "device is [${DEVICE}]"
 	
 }
