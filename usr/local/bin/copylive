@@ -165,7 +165,7 @@ copyfiles () {
 	find "$1" -type l -exec rm -v {} \;
 
 	# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
-	cp -dR -v -T "$1" "/mnt/$2"
+	cp -dR -v -T "${VERBOSE}" "$1" "/mnt/$2"
 	exitonerror $? "Could not copy $1 files to /mnt/$2"
 	
 	# umount device which must be in fstab
@@ -177,12 +177,21 @@ copyfiles () {
 # to /root/cdrom and set the file permissions
 
 mountcopypermissions() {
+	# make /mnt/cdrom if it does not exist
+	test -d /mnt/cdrom || mkdir /mnt/cdrom
+	
+	# mount the cdrom
 	mount "$1" /mnt/cdrom -o ro
 	exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom"
 
+	# if /root/cdrom exists
+	# delete it
+	test -d /root/cdrom && rm -rf /root/cdrom
+
+	# copy cdrom files to root
 	cp -dRv /mnt/cdrom /root/
 	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
-	
+
 	# set file and directory permissions
 	find /root/cdrom -type f -exec chmod a+w {} \;
 	find /root/cdrom -type d -exec chmod 755 {} \;
@@ -203,6 +212,7 @@ usage() {
 	echo "-D size in GB of LINUXLIVE partition, default = 8GB";
 	echo "-W size in GB of writable partition, default = 10GB";
 	echo "-M size in GB of MCTREC partition, default = 8GB";
+	echo "-v verbose copying"
 	exit 0;
 }
 
@@ -221,11 +231,12 @@ ISOIMAGE="none"
 CPMACRIUM="false"
 CPMCTREC="false"
 INSTALLGRUB="false"
+VERBOSE=" "
 
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts ic:pD:W:M:mth opt
+while getopts ic:pD:W:M:mtvh opt
 do
 	case ${opt} in
 		i) INSTALLGRUB="true";;
@@ -236,6 +247,7 @@ do
 		M) MCTSIZE="${OPTARG}"; PARTDISK="true";;
 		m) CPMACRIUM="true";;
 		t) CPMCTREC="true";;
+		v) VERBOSE="-v";;
 		h) usage;;
 		\?) usage;;
 	esac
@@ -244,17 +256,28 @@ done
 # testing
 # echo "${ISOIMAGE}: ${PARTDISK}, ${LLIVESIZE}, ${WSIZE} , ${MCTSIZE}";
 
+# if -p or -D or -W or -M given , partition the disk
+if test "${PARTDISK}" = "true"; then
+	/usr/local/bin/partdisk.pl -D "${LLIVESIZE}" -W "${WSIZE}" -M "${MCTSIZE}"
+	exitonerror $? "partdisk.pl gave an error ... exiting"
+
+	# copy initialise-linux package to /mnt/writable/upper/root/
+	# check if /mnt/writable exists
+	test -d /mnt/writable || sudo -u robert mkdir /mnt/writable
+	mount -L writable /mnt/writable
+	exitonerror $? "Could not mount /mnt/writable"
+	mkdir -p /mnt/writable/upper/root/
+	exitonerror $? "Could not make directory /mnt/writable/upper/root"
+	cp -v /mnt/debhome/pool/myown/i/initialise-linux/*.deb /mnt/writable/upper/root/
+	exitonerror $? "Could not copy initialise-linux to /mnt/writable/upper/root/"
+	umount /mnt/writable
+	exitonerror $? "Could not umount /mnt/writable"
+fi
+
 # if -c given, create /root/cdrom else /root/cdrom must already exist
 if test "${ISOIMAGE}" != "none"; then
 	# check iso image exists
 	test -f "${ISOIMAGE}" || exitonerror 1 "${ISOIMAGE}: no such file";
-
-	# mount the cdrom
-	# make the directory if necessary
-	if test ! -d /mnt/cdrom; then
-		mkdir /mnt/cdrom
-		exitonerror $? "Could not make directory /mnt/cdrom"
-	fi
 
 	# mount the cdrom for coyping files to /root/cdrom
 	# check if /root/cdrom exists
@@ -262,24 +285,6 @@ if test "${ISOIMAGE}" != "none"; then
 	mountcopypermissions "${ISOIMAGE}"
 
 fi
-
-# if -p or -D or -W or -M given , partition the disk
-if test "${PARTDISK}" = "true"; then
-	/usr/local/bin/partdisk.pl -D "${LLIVESIZE}" -W "${WSIZE}" -M "${MCTSIZE}"
-	exitonerror $? "partdisk.pl gave an error ... exiting"
-fi
-
-# copy initialise-linux package to /mnt/writable/upper/root/
-# check if /mnt/writable exists
-test -d /mnt/writable || sudo -u robert mkdir /mnt/writable
-mount -L writable /mnt/writable
-exitonerror $? "Could not mount /mnt/writable"
-mkdir -p /mnt/writable/upper/root/
-exitonerror $? "Could not make directory /mnt/writable/upper/root"
-cp -v /mnt/debhome/pool/myown/i/initialise-linux/*.deb /mnt/writable/upper/root/
-exitonerror $? "Could not copy initialise-linux to /mnt/writable/upper/root/"
-umount /mnt/writable
-exitonerror $? "Could not umount /mnt/writable"
 
 # copy files for MACRIUM if -m given
 test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "LINUXLIVE"
