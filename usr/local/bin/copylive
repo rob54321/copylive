@@ -241,7 +241,7 @@ ISOIMAGE="none"
 CPMACRIUM="false"
 CPMCTREC="false"
 INSTALLGRUB="false"
-VERBOSE=" "
+VERBOSE="false"
 
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
@@ -257,7 +257,7 @@ do
 		M) MCTSIZE="${OPTARG}"; PARTDISK="true";;
 		m) CPMACRIUM="true";;
 		t) CPMCTREC="true";;
-		v) VERBOSE="-v";;
+		v) VERBOSE="true";;
 		h) usage;;
 		\?) usage;;
 	esac
