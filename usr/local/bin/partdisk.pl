@@ -15,7 +15,23 @@ sub usage {
 	print "-h display this usage\n";
 	exit 0;
 }
+######################################################
+# sub to get total size of disk
+# parameters passed: device ie /dev/sda
+# parameters returned: size in GB
+######################################################
+sub getsize {
+	# parameter
+	my $device = shift @_;
 
+	# get size
+	my @list = `lsblk $device -o SIZE`;
+	chomp(@list);
+	# remove the trailing G
+	$list[1] =~ s/G$//;
+	return $list[1];
+}
+######################################################
 ######################################################
 # sub to delete all partitions and make a
 # partition 1: default=15G  fat32 for MACRIUM REFLECT LABEL = MACRIUM uuid = AED6-434E and LINUXLIVE
@@ -36,7 +52,7 @@ sub partitiondisk {
 	
 	# show devices attached
 	print "######################################################\n";
-	my $rc = system("lsblk -o PATH,TYPE,MODEL,LABEL,MOUNTPOINT");
+	my $rc = system("lsblk -o PATH,TYPE,MODEL,LABEL,MOUNTPOINT,SIZE");
 	die "aborting: error from lsblk\n" unless $rc == 0;
 	print "######################################################\n";
 
@@ -45,6 +61,9 @@ sub partitiondisk {
 
 	my $device = <STDIN>;
 	chomp($device);
+
+	# get the disk size
+	my $devicesize = getsize($device);
 	
 	# show the device to check
 	print "\n######################################################\n";
@@ -52,8 +71,12 @@ sub partitiondisk {
 	die "aborting: error from parted\n" unless $rc == 0;
 	print "######################################################\n";
 
+	# calculate size of last partition
+	# size = disk size  - (linuxlivesize + writablesize + mctrecsize)
+	my $elesize = $devicesize - ($linuxlivesize + $writablesize + $mctrecsize);
+	
 	print "\n\n$device will be partitioned as follows:\n";
-	print "LINUXLIVE partition = $linuxlivesize: writable partion = $writablesize: MCTREC partition = $mctrecsize: ele partition = rest of disk\n";
+	print "Disk size = $devicesize GB\nLINUXLIVE partition = $linuxlivesize GB\nwritable partion = $writablesize GB\nMCTREC partition = $mctrecsize GB\nele partition = $elesize GB\n";
 	print "\n\nAll data on $device will be deleted: is this correct (yes|no)?\n";
 	my $answer = <STDIN>;
 	chomp($answer);
