@@ -165,6 +165,8 @@ copyfiles () {
 	find "$1" -type l -exec rm -v {} \;
 
 	# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
+	echo "copying $1 -> /mnt/$2"
+	
 	if test "${VERBOSE}" = "true"; then
 		cp -dR -T -v "$1" "/mnt/$2"
 		exitonerror $? "Could not copy $1 files to /mnt/$2"
@@ -193,6 +195,8 @@ mountcopypermissions() {
 	test -d /root/cdrom && rm -rf /root/cdrom
 
 	# copy cdrom files to root
+	echo "copying /mnt/cdrom -> /root"
+
 	if test "${VERBOSE}" = "true"; then
 		cp -dR -v /mnt/cdrom /root/
 		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
