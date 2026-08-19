@@ -165,9 +165,13 @@ copyfiles () {
 	find "$1" -type l -exec rm -v {} \;
 
 	# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
-	cp -dR -v -T "${VERBOSE}" "$1" "/mnt/$2"
-	exitonerror $? "Could not copy $1 files to /mnt/$2"
-	
+	if test "${VERBOSE}" = "true"; then
+		cp -dR -T -v "$1" "/mnt/$2"
+		exitonerror $? "Could not copy $1 files to /mnt/$2"
+	else
+		cp -dR -T "$1" "/mnt/$2"
+		exitonerror $? "Could not copy $1 files to /mnt/$2"
+	fi
 	# umount device which must be in fstab
 	umount "/mnt/$2"
 	exitonerror $? "Could not umount /mnt/$2"
@@ -189,15 +193,21 @@ mountcopypermissions() {
 	test -d /root/cdrom && rm -rf /root/cdrom
 
 	# copy cdrom files to root
-	cp -dRv /mnt/cdrom /root/
-	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
+	if test "${VERBOSE}" = "true"; then
+		cp -dR -v /mnt/cdrom /root/
+		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
+	else
+		cp -dR /mnt/cdrom /root
+		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
+	fi
+
+	umount /mnt/cdrom
+	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
 
 	# set file and directory permissions
 	find /root/cdrom -type f -exec chmod a+w {} \;
 	find /root/cdrom -type d -exec chmod 755 {} \;
-	umount /mnt/cdrom
-	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
-	
+
 	# copy grub.cfg to /root/cdrom/boot/grub.cfg
 	copygrub
 }
