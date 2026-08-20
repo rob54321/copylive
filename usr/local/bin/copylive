@@ -12,12 +12,19 @@
 
 # the rc code is passed as first parameter, no exit on 0, exit on 1, 2, 3..
 # second parameter is the error string
+# third parameter is the device to un mount if there is one.
 exitonerror() {
 	# test rc code
 	if test $1 -ne 0; then
 		# display error string
 		echo "$2"
-		exit 1;
+		
+		# check if $3 is a device to umount
+		if test "$3" != ""; then
+			findmnt "$3"
+			test "$?" -eq 0 && umount -v "$3"
+		fi
+		exit 1
 	fi
 }
 
@@ -199,7 +206,8 @@ mountcopypermissions() {
 
 	if test "${VERBOSE}" = "true"; then
 		cp -dR -v /mnt/cdrom /root/
-		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
+
+		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
 	else
 		cp -dR /mnt/cdrom /root
 		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
