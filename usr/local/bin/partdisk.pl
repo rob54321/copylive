@@ -75,8 +75,12 @@ sub partitiondisk {
 	# size = disk size  - (linuxlivesize + writablesize + mctrecsize)
 	my $elesize = $devicesize - ($linuxlivesize + $writablesize + $mctrecsize);
 	
-	print "\n\n$device will be partitioned as follows:\n";
-	print "Disk size = $devicesize GB\nLINUXLIVE partition = $linuxlivesize GB\nwritable partion = $writablesize GB\nMCTREC partition = $mctrecsize GB\nele partition = $elesize GB\n";
+	# also show the model no of the disk
+	my @model = `lsblk -o MODEL $device`;
+	chomp(@model);
+	
+	print "\n\nThe disk will be partitioned as follows:\n";
+	print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\nLINUXLIVE partition = $linuxlivesize GB\nwritable partion = $writablesize GB\nMCTREC partition = $mctrecsize GB\nele partition = $elesize GB\n";
 	print "\n\nAll data on $device will be deleted: is this correct (yes|no)?\n";
 	my $answer = <STDIN>;
 	chomp($answer);

@@ -287,11 +287,11 @@ if test "${PARTDISK}" = "true"; then
 	# check if /mnt/writable exists
 	test -d /mnt/writable || sudo -u robert mkdir /mnt/writable
 	mount -L writable /mnt/writable
-	exitonerror $? "Could not mount /mnt/writable"
+	exitonerror $? "Could not mount /mnt/writable" "/mnt/writable"
 	mkdir -p /mnt/writable/upper/root/
-	exitonerror $? "Could not make directory /mnt/writable/upper/root"
+	exitonerror $? "Could not make directory /mnt/writable/upper/root" "/mnt/writable"
 	cp -v /mnt/debhome/pool/myown/i/initialise-linux/*.deb /mnt/writable/upper/root/
-	exitonerror $? "Could not copy initialise-linux to /mnt/writable/upper/root/"
+	exitonerror $? "Could not copy initialise-linux to /mnt/writable/upper/root/" "/mnt/writable"
 	umount /mnt/writable
 	exitonerror $? "Could not umount /mnt/writable"
 fi
