@@ -12,7 +12,7 @@
 
 # the rc code is passed as first parameter, no exit on 0, exit on 1, 2, 3..
 # second parameter is the error string
-# third parameter is the device to un mount if there is one.
+# optional: third parameter is the device to un mounted if there is one. 
 exitonerror() {
 	# test rc code
 	if test $1 -ne 0; then
@@ -165,7 +165,7 @@ copyfiles () {
 	 
 	test -d "/mnt/$2" || mkdir "/mnt/$2"
 	mount -L "$2" "/mnt/$2"
-	exitonerror $? "Could not mount /mnt/$2"
+	exitonerror $? "Could not mount /mnt/$2" "/mnt/$2"
 
 	# links cannot be copied to a fat32 filesystem
 	# delete all links
@@ -176,10 +176,10 @@ copyfiles () {
 	
 	if test "${VERBOSE}" = "true"; then
 		cp -dR -T -v "$1" "/mnt/$2"
-		exitonerror $? "Could not copy $1 files to /mnt/$2"
+		exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
 	else
 		cp -dR -T "$1" "/mnt/$2"
-		exitonerror $? "Could not copy $1 files to /mnt/$2"
+		exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
 	fi
 	# umount device which must be in fstab
 	umount "/mnt/$2"
@@ -195,7 +195,7 @@ mountcopypermissions() {
 	
 	# mount the cdrom
 	mount "$1" /mnt/cdrom -o ro
-	exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom"
+	exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom" "/mnt/cdrom"
 
 	# if /root/cdrom exists
 	# delete it
@@ -210,7 +210,7 @@ mountcopypermissions() {
 		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
 	else
 		cp -dR /mnt/cdrom /root
-		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom"
+		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
 	fi
 
 	umount /mnt/cdrom
