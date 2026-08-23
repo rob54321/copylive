@@ -35,8 +35,8 @@ sub getsize {
 ######################################################
 # sub to delete all partitions and make a
 # partition 1: default=15G  fat32 for MACRIUM REFLECT LABEL = MACRIUM uuid = AED6-434E and LINUXLIVE
-# partition 2: 8G fat 32 MCTREC windows media creation tool 2222-2222
-# partition 3: default=10GB writable ext4 for persistence partition
+# partition 2: default=10GB writable ext4 for persistence partition
+# partition 3: 8G fat 32 MCTREC windows media creation tool 2222-2222
 # partition 4: rest of disk ntfs LABEL = ele
 # all data on the disk is deleted.
 # the partitions are also formatted.
