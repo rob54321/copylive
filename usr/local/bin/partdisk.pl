@@ -113,7 +113,7 @@ sub partitiondisk {
 		# delete all partitions and make new ones
 		# p1 = LINUXLIVE/MACRIUM p2 = writable p3 = MCTREC p4 = ele
 
-		$rc = system("parted -s --align optimal $device mktable gpt mkpart p1 fat32 $p1start $p1end mkpart p2 fat32 $p2start $p2end mkpart p3 ext4 $p3start $p3end mkpart p4 ntfs  $p4start $p4end set 1 boot on");
+		$rc = system("parted -s --align optimal $device mktable gpt mkpart p1 fat32 $p1start $p1end mkpart p2 ext4 $p2start $p2end mkpart p3 fat32 $p3start $p3end mkpart p4 ntfs  $p4start $p4end set 1 boot on");
 		die "aborting: error partitioning $device\n" unless $rc == 0;
 
 		# format the first partition
