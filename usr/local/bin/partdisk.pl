@@ -80,7 +80,7 @@ sub partitiondisk {
 	chomp(@model);
 	
 	print "\n\nThe disk will be partitioned as follows:\n";
-	print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\nLINUXLIVE partition = $linuxlivesize GB\nwritable partion = $writablesize GB\nMCTREC partition = $mctrecsize GB\nele partition = $elesize GB\n";
+	print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\np1: LINUXLIVE partition = $linuxlivesize GB\np2: writable partion = $writablesize GB\np3: MCTREC partition = $mctrecsize GB\np4: ele partition = $elesize GB\n";
 	print "\n\nAll data on $device will be deleted: is this correct (yes|no)?\n";
 	my $answer = <STDIN>;
 	chomp($answer);
@@ -89,15 +89,15 @@ sub partitiondisk {
 		print "partitioning $device\n";
 
 		# partition 1: LINUXLIVE partition fat32 size is passed as a parameter to this sub
-		# partition 2: MCTREC size is 8GB fat32 media tool creation tool
-		# partition 3: writable partition ext4 for persistence
+		# partition 2: writable partition ext4 for persistence
+		# partition 3: MCTREC size is 8GB fat32 media tool creation tool
 		# partition 4: ele partition ntfs is up to 100%
 		my $p1start = 0;
 		my $p1end = $linuxlivesize;
 		my $p2start = $p1end;
-		my $p2end = $p2start + $mctrecsize; 
+		my $p2end = $p2start + $writablesize;
 		my $p3start = $p2end;
-		my $p3end = $p3start + $writablesize;
+		my $p3end = $p3start + $mctrecsize;
 		my $p4start = $p3end;
 		my $p4end = "100%";
 
@@ -111,7 +111,7 @@ sub partitiondisk {
 		$p4start .= "GB";
 		
 		# delete all partitions and make new ones
-		# p1 = LINUXLIVE/MACRIUM p2 = MCTREC p3 = writable p4 = ele
+		# p1 = LINUXLIVE/MACRIUM p2 = writable p3 = MCTREC p4 = ele
 
 		$rc = system("parted -s --align optimal $device mktable gpt mkpart p1 fat32 $p1start $p1end mkpart p2 fat32 $p2start $p2end mkpart p3 ext4 $p3start $p3end mkpart p4 ntfs  $p4start $p4end set 1 boot on");
 		die "aborting: error partitioning $device\n" unless $rc == 0;
@@ -127,14 +127,14 @@ sub partitiondisk {
 		$rc = system( "mkfs.vfat -v -n LINUXLIVE -i AED6434E " . $device . "1");
 		die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
 
-		# format partition 2 MCTREC
+		# format parition 2 writable
 		print "formatting partition " . $device . "2\n";
-		$rc = system("mkfs.vfat -v -n MCTREC -i 22222222 " . $device . "2");
+		$rc = system("mkfs.ext4 -v -j -L writable " . $device . "2");
 		die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
 
-		# format parition 3 writable
+		# format partition 3 MCTREC
 		print "formatting partition " . $device . "3\n";
-		$rc = system("mkfs.ext4 -v -j -L writable " . $device . "3");
+		$rc = system("mkfs.vfat -v -n MCTREC -i 22222222 " . $device . "3");
 		die "aborting: error formatting " . $device . "3\n" unless $rc == 0;
 
 		# format parition 4 ele
