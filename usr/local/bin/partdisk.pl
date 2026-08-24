@@ -11,7 +11,7 @@ our ($opt_h, $opt_L, $opt_T, $opt_W, $opt_M);
 sub usage {
 	print "-L size of LINUXLIVE partition in GB default is 8GB fat32\n";
 	print "-W (size in GB) default is 10GB persistence partition\n";
-	print "-M size of MACRIUM partition in GB default is 8GB fat32\n";
+	print "-M size of MACRIUM partition in GB default is 1GB fat32\n";
 	print "-T size of MCTREC partition in GB default is 8GB fat32\n";
 	print "-h display this usage\n";
 	exit 0;
@@ -42,18 +42,18 @@ sub getsize {
 # partition 5: rest of disk ntfs LABEL = ele
 # all data on the disk is deleted.
 # the partitions are also formatted.
-# parameters passed: partition 1 MACRIUM size GB
-#                    partition 2 LINUXLIVE size GB
-#                    partition 3 writable size GB
+# parameters passed: partition 1 LINUXLIVE size GB
+#                    partition 2 writable size GB
+#                    partition 3 MACRIUM size GB
 #                    partition 4 MCTREC size GB
 # sub aborts on any error
 # requires: disk for MACRIUM to be attached, not mounted
 ######################################################
 sub partitiondisk {
 	# get size LINUXLIVE and writable partitions
-	my $macriumsize = shift @_;
 	my $linuxlivesize = shift @_;
 	my $writablesize = shift @_;
+	my $macriumsize = shift @_;
 	my $mctrecsize = shift @_;
 	
 	# show devices attached
@@ -86,7 +86,7 @@ sub partitiondisk {
 	chomp(@model);
 	
 	print "\n\nThe disk will be partitioned as follows:\n";
-	print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\np1: MACRIUM partition = $macriumsize GB\np2: LINUXLIVE partition = $linuxlivesize GB\np3: writable partion = $writablesize GB\np4: MCTREC partition = $mctrecsize GB\np5: ele partition = $elesize GB\n";
+	print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\np1: LINUXLIVE partition = $linuxlivesize GB\np2: writable partition = $writablesize GB\np3: MACRIUM partion = $macriumsize GB\np4: MCTREC partition = $mctrecsize GB\np5: ele partition = $elesize GB\n";
 	print "\n\nAll data on $device will be deleted: is this correct (yes|no)?\n";
 	my $answer = <STDIN>;
 	chomp($answer);
@@ -94,17 +94,17 @@ sub partitiondisk {
 	if ($answer =~ /^yes$/i) {
 		print "partitioning $device\n";
 
-		# partition 1: MACRIUM partition fat32 size is passed as a parameter to this sub
-		# partition 2: LINUXLIVE parition fat32
-		# partition 3: writable partition ext4 for persistence
-		# partition 4: MCTREC size is 8GB fat32 media tool creation tool
+		# partition 1: LINUXLIVE parition fat32
+		# partition 2: writable partition ext4 for persistence
+		# partition 3: MACRIUM partition fat32 size is passed as a parameter to this sub
+		# partition 4: MCTREC partition media tool creation tool
 		# partition 5: ele partition ntfs is up to 100%
 		my $p1start = 0;
-		my $p1end = $macriumsize;
+		my $p1end = $linuxlivesize;
 		my $p2start = $p1end;
-		my $p2end = $p2start + $linuxlivesize;
+		my $p2end = $p2start + $writablesize;
 		my $p3start = $p2end;
-		my $p3end = $p3start + $writablesize;
+		my $p3end = $p3start + $macriumsize;
 		my $p4start = $p3end;
 		my $p4end = $p4start + $mctrecsize;
 		my $p5start = $p4end;
@@ -124,7 +124,7 @@ sub partitiondisk {
 		# delete all partitions and make new ones
 		# p1 = LINUXLIVE/MACRIUM p2 = writable p3 = MCTREC p4 = ele
 
-		$rc = system("parted -s --align optimal $device mktable gpt mkpart p1 fat32 $p1start $p1end mkpart p2 fat32 $p2start $p2end mkpart p3 ext4 $p3start $p3end mkpart p4 fat32  $p4start $p4end mkpart p5 ntfs $p5start $p5end set 1 boot on");
+		$rc = system("parted -s --align optimal $device mktable gpt mkpart p1 fat32 $p1start $p1end mkpart p2 ext4 $p2start $p2end mkpart p3 fat32 $p3start $p3end mkpart p4 fat32  $p4start $p4end mkpart p5 ntfs $p5start $p5end set 1 boot on");
 		die "aborting: error partitioning $device\n" unless $rc == 0;
 
 		# format the first partition
@@ -133,27 +133,27 @@ sub partitiondisk {
 		# if partition size is bigger than 12GB
 		sleep 2;
 
-		# format partition 1 MACRIUM
+		# format parition 1 LINUXLIVE
 		print "formatting partition " . $device . "1\n";
-		$rc = system( "mkfs.vfat -v -n MACRIUM -i AED6434E " . $device . "1");
+		$rc = system("mkfs.vfat -v -n LINUXLIVE -i 11111111 " . $device . "1");
 		die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
 
-		# format parition 2 LINUXLIVE
+		# format parition 2 writable
 		print "formatting partition " . $device . "2\n";
-		$rc = system("mkfs.vfat -v -n LINUXLIVE -i 22222222 " . $device . "2");
+		$rc = system("mkfs.ext4 -v -j -L writable " . $device . "2");
 		die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
 
-		# format parition 2 writable
+		# format partition 3 MACRIUM
 		print "formatting partition " . $device . "3\n";
-		$rc = system("mkfs.ext4 -v -j -L writable " . $device . "3");
+		$rc = system( "mkfs.vfat -v -n MACRIUM -i AED6434E " . $device . "3");
 		die "aborting: error formatting " . $device . "3\n" unless $rc == 0;
 
-		# format partition 3 MCTREC
+		# format partition 4 MCTREC
 		print "formatting partition " . $device . "4\n";
 		$rc = system("mkfs.vfat -v -n MCTREC -i 44444444 " . $device . "4");
 		die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
 
-		# format parition 4 ele
+		# format parition 5 ele
 		print "formatting partition " . $device . "5\n";
 		$rc = system("mkfs.ntfs -v -Q -L ele  " . $device . "5");
 		die "aborting: error formatting " . $device . "5\n" unless $rc == 0;
@@ -173,7 +173,7 @@ sub partitiondisk {
 # -M is size of  MACRIUM partition in GB default is 8GB
 # -T is size of MCRECT partition in GB default is 8GB
 # set defaults in GB
-my $macriumsize = 8;
+my $macriumsize = 1;
 my $linuxlivesize = 8;
 my $writablesize = 10;
 my $mctrecsize = 8;
@@ -195,5 +195,5 @@ $mctrecsize = $opt_T if $opt_T;
 # set size of macrium partition
 $macriumsize = $opt_M if $opt_M;
 
-partitiondisk($macriumsize, $linuxlivesize, $writablesize, $mctrecsize);
+partitiondisk($linuxlivesize, $writablesize, $macriumsize, $mctrecsize);
 
