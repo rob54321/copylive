@@ -84,8 +84,16 @@ getdevice () {
 # the global variable DISTRONAME is set
 ################################################################
 getdistroname () {
+	# get the long name
+	# Ubuntu-Cinnamon 26.04 "Resolute Raccoon" - Release amd64 (20260423.1)
+	# strip from ' - Release ...to end
+	# replace each " with \"
 	LIST=`cat /root/cdrom/.disk/info`;
-	DISTRONAME=$(perl -e 'my $name = shift; $name =~ s/ - .*$//; print "$name";' "${LIST}");
+	DISTRONAME=$(perl -e 'my $name = shift; $name =~ s/ - .*$//;
+							$name =~ s/"//g;
+							print "$name";
+							' "${LIST}");
+	
 	echo "getdistroname: distroname: ${DISTRONAME}"
 }
 
