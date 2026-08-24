@@ -118,9 +118,9 @@ menuentry \"Try $1\" {
 	insmod part_gpt
 	insmod fat
 	if [ x\$feature_platform_search_hint = xy ]; then
-	  search --no-floppy --fs-uuid --set=root  AED6-434E
+	  search --no-floppy --fs-uuid --set=root  2222-2222
 	else
-	  search --no-floppy --fs-uuid --set=root AED6-434E
+	  search --no-floppy --fs-uuid --set=root 2222-2222
 	fi
 
     linux  /casper/vmlinuz  --- username=robert hostname=live persistent persistent-path=/casper/ noprompt
@@ -151,9 +151,9 @@ menuentry \"Windows Media Creation Tool Recovery (Read the instructions on the n
 	insmod part_gpt
 	insmod fat
 	if [ x\$feature_platform_search_hint = xy ]; then
-	  search --no-floppy --fs-uuid --set=root  2222-2222
+	  search --no-floppy --fs-uuid --set=root  4444-4444
 	else
-	  search --no-floppy --fs-uuid --set=root 2222-2222
+	  search --no-floppy --fs-uuid --set=root 4444-4444
 	fi
 	chainloader /bootmgfw.efi
 }
@@ -252,12 +252,13 @@ mountcopypermissions() {
 usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
 	echo "-i install grub"
-	echo "-m copy MACRIUM files to LINUXLIVE partition";
+	echo "-m copy MACRIUM files to MACRIUM partition";
 	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
-	echo "-D size in GB of LINUXLIVE partition, default = 8GB";
+	echo "-M size in GB of MACRIUM parition, default = 8GB";
+	echo "-L size in GB of LINUXLIVE partition, default = 8GB";
 	echo "-W size in GB of writable partition, default = 10GB";
-	echo "-M size in GB of MCTREC partition, default = 8GB";
+	echo "-T size in GB of MCTREC partition, default = 8GB";
 	echo "-v verbose copying"
 	exit 0;
 }
@@ -272,6 +273,7 @@ PARTDISK="false"
 LLIVESIZE=8;
 WSIZE=10;
 MCTSIZE=8;
+MASIZE=8;
 # default values for switches
 ISOIMAGE="none"
 CPMACRIUM="false"
@@ -282,15 +284,16 @@ VERBOSE="false"
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts ic:pD:W:M:mtvh opt
+while getopts ic:pD:W:M:L:T:mtvh opt
 do
 	case ${opt} in
 		i) INSTALLGRUB="true";;
 		c) ISOIMAGE="${OPTARG}";;
 		p) PARTDISK="true";;
-		D) LLIVESIZE="${OPTARG}"; PARTDISK="true";;
+		M) MASIZE="${OPTARG}";;
+		L) LLIVESIZE="${OPTARG}"; PARTDISK="true";;
 		W) WSIZE="${OPTARG}"; PARTDISK="true";;
-		M) MCTSIZE="${OPTARG}"; PARTDISK="true";;
+		T) MCTSIZE="${OPTARG}"; PARTDISK="true";;
 		m) CPMACRIUM="true";;
 		t) CPMCTREC="true";;
 		v) VERBOSE="true";;
@@ -304,7 +307,7 @@ done
 
 # if -p or -D or -W or -M given , partition the disk
 if test "${PARTDISK}" = "true"; then
-	/usr/local/bin/partdisk.pl -D "${LLIVESIZE}" -W "${WSIZE}" -M "${MCTSIZE}"
+	/usr/local/bin/partdisk.pl -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
 	exitonerror $? "partdisk.pl gave an error ... exiting"
 
 	# copy initialise-linux package to /mnt/writable/upper/root/
@@ -333,7 +336,7 @@ if test "${ISOIMAGE}" != "none"; then
 fi
 
 # copy files for MACRIUM if -m given
-test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "LINUXLIVE"
+test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "MACRIUM"
 
 # for mctrec if -t given
 test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "MCTREC"
