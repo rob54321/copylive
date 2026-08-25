@@ -288,7 +288,7 @@ mountcopypermissions() {
 	test -d /mnt/cdrom || mkdir /mnt/cdrom
 
 	# mount the cdrom
-	umountlabel "/mnt/cdrom"
+
 	mount "$1" /mnt/cdrom -o ro
 	exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom" "/mnt/cdrom"
 
@@ -308,7 +308,7 @@ mountcopypermissions() {
 		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
 	fi
 
-	umountlabel "/mnt/cdrom"
+	umount "/mnt/cdrom"
 	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
 
 	# set file and directory permissions
@@ -377,11 +377,7 @@ do
 		h) usage;;
 		\?) usage;;
 	esac
-done
-
-# testing #
-umountlabel "writable"
-exit 
+done 
 
 # testing
 # echo "${ISOIMAGE}: ${PARTDISK}, ${LLIVESIZE}, ${WSIZE} , ${MCTSIZE}";
