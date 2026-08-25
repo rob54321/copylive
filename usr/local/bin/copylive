@@ -142,8 +142,8 @@ installgrub () {
 	# the LINUXLIVE DEVICE was found
 	# install grub
 	# TESTING
-	echo "testing: install-grub on ${DEVICE}"
-#	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
+#	echo "testing: install-grub on ${DEVICE}"
+	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
 	exitonerror $? "Error installing grub"
 }
 
