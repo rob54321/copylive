@@ -173,7 +173,7 @@ sub partitiondisk {
 # -M is size of  MACRIUM partition in GB default is 8GB
 # -T is size of MCRECT partition in GB default is 8GB
 # set defaults in GB
-my $macriumsize = 1;
+my $macriumsize = 2;
 my $linuxlivesize = 8;
 my $writablesize = 10;
 my $mctrecsize = 8;

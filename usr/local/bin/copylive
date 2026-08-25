@@ -18,7 +18,7 @@ exitonerror() {
 	if test $1 -ne 0; then
 		# display error string
 		echo "$2"
-		
+
 		# check if $3 is a device to umount
 		if test "$3" != ""; then
 			findmnt "$3"
@@ -31,14 +31,12 @@ exitonerror() {
 # getdevice gets the device that LINUXLIVE is on.
 # this function returns the device of form /dev/sda
 # or none if device was not found.
-# the device is written to /tmp/device.txt so that
-# it can be passed to back to bash
+# the device or none is captured by the calling
+# function
 getdevice () {
 	# call a perl function to get the LINUXLIVE device
-	perl -e 'use strict; use warnings; do {
-										# delete /tmp/device.txt
-										unlink "/tmp/device.txt";
-
+	DEVICE=$(perl -e 'use strict; use warnings; do {
+										# get all devices
 										my @list = `lsblk -o PATH,LABEL`;
 										chomp(@list);
 										# for each item in list
@@ -47,36 +45,51 @@ getdevice () {
 											if ($line =~ /LINUXLIVE/) {
 												# line = /dev/sda3    label
 												# search for partition name first
+												# remove white space to end of line
 												$line =~ s/\s+.*$//;
 												# line is of form /dev/sda12
 												# remove digits to end of line
 												$line =~ s/\d+.*$//;
-												# write device to /tmp/device.txt
-												# for bash script
-												unlink "/tmp/device.txt";
-												open (FH, ">", "/tmp/device.txt") or die "Could not open file: $!\n";
-												print FH "$line";
-												close FH;
+												# print the value
+												# so it is captured by DEVICE
+												print "$line";
+												# exit the loop
 												last;
 											}
 										}
-									}'
-	# get the device from the file
-	# or none if not found
-	# cannot return a string in bash.
-	# DEVICE is a global variable
-	# if there is no file /tmp/device.txt
-	# then LINUXLIVE was not found
-	if test -f "/tmp/device.txt"; then
-		# LINUXLIVE was found
-		DEVICE=`cat /tmp/device.txt`
+									}')
+	# if the device was found echo value
+	# else echo none
+	if test "${DEVICE}" != ""; then
+		echo "${DEVICE}"
 	else
-		# LINUXLIVE was not found
-		DEVICE="none"
+		echo "none"
 	fi
-	echo "device is [${DEVICE}]"
-	
 }
+
+#########################################################################
+# function to install grub
+# parameters passed: DEVICE
+#########################################################################
+installgrub () {
+	# copy cdrom files to LINUXLIVE
+	copyfiles "/root/cdrom" "LINUXLIVE"
+
+	DEVICE=`getdevice`
+
+	if test "${DEVICE}" != "none"; then
+		# the LINUXLIVE DEVICE was found
+		# install grub
+		grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
+		exitonerror $? "Error installing grub"
+	else
+		# LINUXLIVE device was not found
+		echo "LINUXLIVE device not found, could not install grub"
+		exitonerror 1 "LINUXLIVE not found...exiting"
+	fi
+}
+
+
 ################################################################
 # function to get distro name from cdrom/.disk/info
 # the name is used for grub.cfg
@@ -92,10 +105,9 @@ getdistroname () {
 	DISTRONAME=$(perl -e 'my $name = shift; $name =~ s/ - .*$//;
 							$name =~ s/"//g;
 							chomp($name);
-							print "$name";
-							' "${LIST}");
-	
-	echo "getdistroname: distroname: ${DISTRONAME}"
+							print "$name";' "${LIST}");
+
+	echo "${DISTRONAME}"
 }
 
 # function to copy grub.cfg to /root/cdrom/boot/grub/grub.cfg
@@ -214,7 +226,7 @@ copyfiles () {
 mountcopypermissions() {
 	# make /mnt/cdrom if it does not exist
 	test -d /mnt/cdrom || mkdir /mnt/cdrom
-	
+
 	# mount the cdrom
 	mount "$1" /mnt/cdrom -o ro
 	exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom" "/mnt/cdrom"
@@ -242,9 +254,12 @@ mountcopypermissions() {
 	find /root/cdrom -type f -exec chmod a+w {} \;
 	find /root/cdrom -type d -exec chmod 755 {} \;
 
-	# get ditro name from /mnt/cdrom/.disk/info
-	getdistroname
+	# get distro name from /mnt/cdrom/.disk/info
+	DISTRONAME=`getdistroname`;
 	
+	# echo distro name
+	echo "distro name: ${DISTRONAME}"
+
 	# copy grub.cfg to /root/cdrom/boot/grub.cfg
 	copygrub "${DISTRONAME}"
 }
@@ -274,7 +289,7 @@ PARTDISK="false"
 LLIVESIZE=8;
 WSIZE=10;
 MCTSIZE=8;
-MASIZE=1;
+MASIZE=2;
 # default values for switches
 ISOIMAGE="none"
 CPMACRIUM="false"
@@ -291,7 +306,7 @@ do
 		i) INSTALLGRUB="true";;
 		c) ISOIMAGE="${OPTARG}";;
 		p) PARTDISK="true";;
-		M) MASIZE="${OPTARG}";;
+		M) MASIZE="${OPTARG}"; PARTDISK="true";;
 		L) LLIVESIZE="${OPTARG}"; PARTDISK="true";;
 		W) WSIZE="${OPTARG}"; PARTDISK="true";;
 		T) MCTSIZE="${OPTARG}"; PARTDISK="true";;
@@ -345,20 +360,4 @@ test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "MCTREC"
 # install grub to the correct device
 # device is in /root/.device which was written by partdisk.pl
 # get the device, if device not found, none is returned
-if test "${INSTALLGRUB}" = "true"; then
-	# copy cdrom files to LINUXLIVE
-	copyfiles "/root/cdrom" "LINUXLIVE"
-
-	getdevice
-
-	if test "${DEVICE}" != "none"; then
-		# the LINUXLIVE DEVICE was found
-		# install grub
-		grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
-		exitonerror $? "Error installing grub"
-	else
-		# LINUXLIVE device was not found
-		echo "LINUXLIVE device not found, could not install grub"
-		exitonerror 1 "LINUXLIVE not found...exiting"
-	fi
-fi
+test "${INSTALLGRUB}" = "true" && installgrub
