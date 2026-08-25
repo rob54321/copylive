@@ -170,7 +170,7 @@ sub partitiondisk {
 
 # -L is size of LINUXLIVE
 # -W is size of writable partition for persitence in GB default is 10GB
-# -M is size of  MACRIUM partition in GB default is 8GB
+# -M is size of  MACRIUM partition in GB default is 2GB
 # -T is size of MCRECT partition in GB default is 8GB
 # set defaults in GB
 my $macriumsize = 2;

@@ -6,7 +6,8 @@
 # -p partition disk
 # -L size of linuxlive parition, default is 8GB   -- for partdisk.pl
 # -W size of writable partition, default is 10GB  -- for partdisk.pl
-# -M size of MCTREC partition, default is 1GB     -- for partdisk.pl
+# -M size of MACRIUM partition, default is 2GB     -- for partdisk.pl
+# -T size of MCTREC partition, default is 8GB
 # -i iso image to use
 # -h a help message
 
@@ -28,11 +29,55 @@ exitonerror() {
 	fi
 }
 
+##########################################################################################
+# function to umount LABEL = $1 on /mnt/LABEL
+# checks for multiple mounts on multiple mountpoints first.
+# unmounts all erroneous mounts
+# exits on error if any error occurs
+# parameters passed: LABEL
+##########################################################################################
+umountlabel () {
+	# get the path of the LINUXLIVE, MACRIUM, MCTREC, writable
+	# all are on the same device.
+	DEVICE=`getdevice`
+	
+	# set the partition number to be un mounted
+	
+	# the partitions are numbered as follows:
+	# p 1 LINUXLIVE
+	# p 2 writable
+	# p 3 MACRIUM
+	# p 4 MCTREC
+	# p 5 ele
+	# all are on the same device
+	case $1 in
+		LINUXLIVE) p=1;;
+		writable)  p=2;;
+		MACRIUM)   p=3;;
+		MCTREC)    p=4;;
+		ele)       p=5;;
+		*)         exitonerror 1 "Unknown option for umountlabel(): $1";;
+	esac
+	PARTITION="${DEVICE}${p}"
+	
+	# get a list of mount points for the partition
+	# unmount all of them
+	perl -e 'use strict; use warnings;
+				my $partition = shift;
+				my @list = `findmnt -o TARGET $partition`;
+				chomp(@list);
+				for (my $i=1; $i<scalar(@list); $i++) {
+					# umount all
+					system("umount -v $list[$i]");
+				}' "${PARTITION}";
+}
+
 # getdevice gets the device that LINUXLIVE is on.
 # this function returns the device of form /dev/sda
 # or none if device was not found.
 # the device or none is captured by the calling
 # function
+# parameters passed: none
 getdevice () {
 	# call a perl function to get the LINUXLIVE device
 	DEVICE=$(perl -e 'use strict; use warnings; do {
@@ -69,24 +114,37 @@ getdevice () {
 
 #########################################################################
 # function to install grub
-# parameters passed: DEVICE
+# parameters passed: none
 #########################################################################
 installgrub () {
-	# copy cdrom files to LINUXLIVE
-	copyfiles "/root/cdrom" "LINUXLIVE"
-
+	# get device for grub install
 	DEVICE=`getdevice`
+	test "${DEVICE}" = "none" && exitonerror 1 "LINUXLIVE not found: could not install grub"
 
-	if test "${DEVICE}" != "none"; then
-		# the LINUXLIVE DEVICE was found
-		# install grub
-		grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
-		exitonerror $? "Error installing grub"
-	else
-		# LINUXLIVE device was not found
-		echo "LINUXLIVE device not found, could not install grub"
-		exitonerror 1 "LINUXLIVE not found...exiting"
-	fi
+	# only copy cdrom files to LINUXLIVE if the linux files are not on LINUXLIVE
+	
+	# mkdir /mnt/LINUXLIVE if it does not exist
+	test -d "/mnt/LINUXLIVE" || sudo -u "robert" mkdir "/mnt/LINUXLIVE"
+
+	# umount LINUXLIVE
+	umountlabel "LINUXLIVE"
+	mount -v -L "LINUXLIVE"
+	exitonerror $? "Could not mount LINUXLIVE" "/mnt/LINUXLIVE"
+
+	# check for directories: casper  LINUXLIVE
+	test -d "/mnt/LINUXLIVE/casper" || copyfiles "/root/cdrom" "LINUXLIVE"
+
+	# umount /mnt/LINUXLIVE
+	echo "installgrub: unmounting LINUXLIVE"
+	umount -v "/mnt/LINUXLIVE"
+	exitonerror $? "Could not umount LINUXLIVE" "/mnt/LINUXLIVE"
+	
+	# the LINUXLIVE DEVICE was found
+	# install grub
+	# TESTING
+	echo "testing: install-grub on ${DEVICE}"
+#	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
+	exitonerror $? "Error installing grub"
 }
 
 
@@ -198,8 +256,11 @@ copyfiles () {
 	# 2 label MACRIUM or MCTREC or LINUXLIVE for file type
 	 
 	test -d "/mnt/$2" || mkdir "/mnt/$2"
+
+	# mount LABEL if not already mounted
+	umountlabel "$2"
 	mount -L "$2" "/mnt/$2"
-	exitonerror $? "Could not mount /mnt/$2" "/mnt/$2"
+	exitonerror "$?" "copyfiles: Could not mount $2 on /mnt/$2" "/mnt/$2"
 
 	# links cannot be copied to a fat32 filesystem
 	# delete all links
@@ -216,8 +277,7 @@ copyfiles () {
 		exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
 	fi
 	# umount device which must be in fstab
-	umount "/mnt/$2"
-	exitonerror $? "Could not umount /mnt/$2"
+	umountlabel "$2"
 }
 
 # function to mount cdrom, copy files
@@ -228,6 +288,7 @@ mountcopypermissions() {
 	test -d /mnt/cdrom || mkdir /mnt/cdrom
 
 	# mount the cdrom
+	umountlabel "/mnt/cdrom"
 	mount "$1" /mnt/cdrom -o ro
 	exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom" "/mnt/cdrom"
 
@@ -247,7 +308,7 @@ mountcopypermissions() {
 		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
 	fi
 
-	umount /mnt/cdrom
+	umountlabel "/mnt/cdrom"
 	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
 
 	# set file and directory permissions
@@ -271,10 +332,10 @@ usage() {
 	echo "-m copy MACRIUM files to MACRIUM partition";
 	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
-	echo "-M size in GB of MACRIUM parition, default = 1GB";
-	echo "-L size in GB of LINUXLIVE partition, default = 8GB";
-	echo "-W size in GB of writable partition, default = 10GB";
-	echo "-T size in GB of MCTREC partition, default = 8GB";
+	echo "-M size in GB of MACRIUM parition, default = ${MASIZE}GB";
+	echo "-L size in GB of LINUXLIVE partition, default = ${LLIVESIZE}GB";
+	echo "-W size in GB of writable partition, default = ${WSIZE}GB";
+	echo "-T size in GB of MCTREC partition, default = ${MCTSIZE}GB";
 	echo "-v verbose copying"
 	exit 0;
 }
@@ -317,6 +378,10 @@ do
 		\?) usage;;
 	esac
 done
+
+# testing #
+umountlabel "writable"
+exit 
 
 # testing
 # echo "${ISOIMAGE}: ${PARTDISK}, ${LLIVESIZE}, ${WSIZE} , ${MCTSIZE}";
