@@ -515,7 +515,7 @@ test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "MCTREC"
 if test "${REINSTALLLINUXFORMAT}" = "true"; then
 	# reinstall and format writable
 	reinstall "format"
-elif test "${REINSTALL}" = "true"; then
+elif test "${REINSTALLLINUX}" = "true"; then
 	# reinstall and no format
 	reinstall
 fi
