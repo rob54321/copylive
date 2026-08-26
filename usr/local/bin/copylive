@@ -29,6 +29,48 @@ exitonerror() {
 	fi
 }
 
+#############################################################################
+# getdevice gets the device that LINUXLIVE is on.
+# this function returns the device of form /dev/sda
+# or none if device was not found.
+# the device or none is captured by the calling
+# function
+# parameters passed: none
+#############################################################################
+getdevice () {
+	# call a perl function to get the LINUXLIVE device
+	DEVICE=$(perl -e 'use strict; use warnings; do {
+										# get all devices
+										my @list = `lsblk -o PATH,LABEL`;
+										chomp(@list);
+										# for each item in list
+										foreach my $line (@list) {
+											# if line contains LINUXLIVE get device path
+											if ($line =~ /LINUXLIVE/) {
+												# line = /dev/sda3    label
+												# search for partition name first
+												# remove white space to end of line
+												$line =~ s/\s+.*$//;
+												# line is of form /dev/sda12
+												# remove digits to end of line
+												$line =~ s/\d+.*$//;
+												# print the value
+												# so it is captured by DEVICE
+												print "$line";
+												# exit the loop
+												last;
+											}
+										}
+									}')
+	# if the device was found echo value
+	# else echo none
+	if test "${DEVICE}" != ""; then
+		echo "${DEVICE}"
+	else
+		echo "none"
+	fi
+}
+
 ##########################################################################################
 # function to umount LABEL = $1 on /mnt/LABEL
 # checks for multiple mounts on multiple mountpoints first.
@@ -72,46 +114,6 @@ umountlabel () {
 				}' "${PARTITION}";
 }
 
-# getdevice gets the device that LINUXLIVE is on.
-# this function returns the device of form /dev/sda
-# or none if device was not found.
-# the device or none is captured by the calling
-# function
-# parameters passed: none
-getdevice () {
-	# call a perl function to get the LINUXLIVE device
-	DEVICE=$(perl -e 'use strict; use warnings; do {
-										# get all devices
-										my @list = `lsblk -o PATH,LABEL`;
-										chomp(@list);
-										# for each item in list
-										foreach my $line (@list) {
-											# if line contains LINUXLIVE get device path
-											if ($line =~ /LINUXLIVE/) {
-												# line = /dev/sda3    label
-												# search for partition name first
-												# remove white space to end of line
-												$line =~ s/\s+.*$//;
-												# line is of form /dev/sda12
-												# remove digits to end of line
-												$line =~ s/\d+.*$//;
-												# print the value
-												# so it is captured by DEVICE
-												print "$line";
-												# exit the loop
-												last;
-											}
-										}
-									}')
-	# if the device was found echo value
-	# else echo none
-	if test "${DEVICE}" != ""; then
-		echo "${DEVICE}"
-	else
-		echo "none"
-	fi
-}
-
 #########################################################################
 # function to install grub
 # parameters passed: none
@@ -142,8 +144,8 @@ installgrub () {
 	# the LINUXLIVE DEVICE was found
 	# install grub
 	# TESTING
-#	echo "testing: install-grub on ${DEVICE}"
-	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
+	echo "testing: install-grub on ${DEVICE}"
+#	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
 	exitonerror $? "Error installing grub"
 }
 
@@ -240,9 +242,13 @@ menuentry 'UEFI Firmware Settings' {
 fi" > /root/cdrom/boot/grub/grub.cfg
 }
 
+##################################################################################
 # function to copy MCTREC, MACRIUM and 
 # LINUXLIVE files to the hard disk. Partitions are mounted
 # and unmounted.
+# parameters passed 1. full source path
+#                   2. LABEL of partition
+##################################################################################
 copyfiles () {
 	# mount MCTREC and LINUXLIVE partitions and
 	# copy files for macrium and mctrec from 
@@ -280,17 +286,58 @@ copyfiles () {
 	umountlabel "$2"
 }
 
+##########################################################################################
+# function to reinstall linux on LINUXLIVE parition
+# cdrom must exist in /mnt/cdrom
+# disk must be partitioned
+# LINUXLIVE is formatted with -i 11111111
+# and files copied using copyfiles()
+# grub is not installed from this function
+# no parameters passed
+##########################################################################################
+reinstall() {
+	# check /root/cdrom exists
+	test -d "/root/cdrom/casper"
+	exitonerror $? "/root/cdrom does not exist..exiting"
+	
+	# check if directory /mnt/LINUXLIVE exists
+	test -d "/mnt/LINUXLIVE" || mkdir "/mnt/LINUXLIVE"
+
+	# umount parititon incase it is mounted
+	umountlabel "LINUXLIVE"
+
+	# get the LINUXLIVE device for formatting
+	DEVICE=`getdevice`
+	
+	# LINUXLIVE partition is the first partition
+	mkfs.vfat -v -n LINUXLIVE -i 11111111 "${DEVICE}1"
+	exitonerror $? "Error formatting ${DEVICE}1"
+
+	# copy files from /root/cdrom -> /mnt/LINUXLIVE
+	copyfiles "/root/cdrom" "LINUXLIVE"
+}
+
+##################################################################
 # function to mount cdrom, copy files
 # to /root/cdrom and set the file permissions
-
+# parameters passed: isoimage name
+##################################################################
 mountcopypermissions() {
 	# make /mnt/cdrom if it does not exist
 	test -d /mnt/cdrom || mkdir /mnt/cdrom
 
 	# mount the cdrom
+	# umount it first if mounted
+	# since the wrong one may be mounted
+	findmnt /mnt/cdrom > /dev/null 2>&1
+	if test "$?" -eq 0; then
+		umount -v "/mnt/cdrom"
+		exitonerror $? "Error umounting $1"
+	fi
 
+	# mount the cdrom
 	mount "$1" /mnt/cdrom -o ro
-	exitonerror $? "Could not mount ${ISOIMAGE} on /mnt/cdrom" "/mnt/cdrom"
+	exitonerror $? "Could not mount $1 on /mnt/cdrom" "/mnt/cdrom"
 
 	# if /root/cdrom exists
 	# delete it
@@ -329,6 +376,7 @@ mountcopypermissions() {
 usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
 	echo "-i install grub"
+	echo "-r reinstall linux, formats LINUXLIVE partition";
 	echo "-m copy MACRIUM files to MACRIUM partition";
 	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
@@ -357,14 +405,16 @@ CPMACRIUM="false"
 CPMCTREC="false"
 INSTALLGRUB="false"
 VERBOSE="false"
+REINSTALLLINUX="false"
 
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts ic:pD:W:M:L:T:mtvh opt
+while getopts irc:pD:W:M:L:T:mtvh opt
 do
 	case ${opt} in
 		i) INSTALLGRUB="true";;
+		r) REINSTALLLINUX="true";;
 		c) ISOIMAGE="${OPTARG}";;
 		p) PARTDISK="true";;
 		M) MASIZE="${OPTARG}"; PARTDISK="true";;
@@ -417,6 +467,9 @@ test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "MACRIUM"
 
 # for mctrec if -t given
 test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "MCTREC"
+
+# reinstall linux if -r given
+test "${REINSTALLLINUX}" = "true" && reinstall
 
 # install grub to the correct device
 # device is in /root/.device which was written by partdisk.pl
