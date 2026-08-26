@@ -338,9 +338,16 @@ reinstall() {
 	exitonerror $? "Error formatting LINUXLIVE ${DEVICE}1"
 
 	# also format the writable partition
-	umountlabel "writable"
-	mkfs.ext4 -v -j -L writable "${DEVICE}2"
-	exitonerror $? "Error formatting writable ${DEVICE}2"
+	# prompt to see if it should be overwritten
+	echo " "
+	echo " "
+	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	read -t 20 -p "Format the writable partition? This is only necessary if the version of linux has changed: (yes/no)" ANSWER
+	if test "${ANSWER}" = "yes"; then
+		umountlabel "writable"
+		mkfs.ext4 -v -j -L writable "${DEVICE}2"
+		exitonerror $? "Error formatting writable ${DEVICE}2"
+	fi
 
 	# copy the latest version of initialise-linux
 	# from /mnt/debhome/pool/myown/i/initialise-linux* to /mnt/writable/upper/root/
@@ -409,7 +416,7 @@ mountcopypermissions() {
 usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
 	echo "-i install grub"
-	echo "-r reinstall linux, formats LINUXLIVE partition";
+	echo "-r reinstall linux, formats LINUXLIVE and prompts to format writable";
 	echo "-m copy MACRIUM files to MACRIUM partition";
 	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
