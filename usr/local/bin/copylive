@@ -140,30 +140,23 @@ copyinitialise() {
 
 #########################################################################
 # function to install grub
-# parameters passed: none
+# parameters passed: copy or nothing
+# if copy is passed then cdrom is copied to LINUXLIVE
 #########################################################################
 installgrub () {
 	# get device for grub install
 	DEVICE=`getdevice`
 	test "${DEVICE}" = "none" && exitonerror 1 "LINUXLIVE not found: could not install grub"
 
-	# only copy cdrom files to LINUXLIVE if the linux files are not on LINUXLIVE
-
 	# mkdir /mnt/LINUXLIVE if it does not exist
 	test -d "/mnt/LINUXLIVE" || sudo -u "robert" mkdir "/mnt/LINUXLIVE"
 
-	# umount LINUXLIVE
-	umountlabel "LINUXLIVE"
-	mount -v -L "LINUXLIVE"
-	exitonerror $? "Could not mount LINUXLIVE" "/mnt/LINUXLIVE"
-
 	# check for directories: casper  LINUXLIVE
-	test -d "/mnt/LINUXLIVE/casper" || copyfiles "/root/cdrom" "LINUXLIVE"
+	test "$1" = "copy" && copyfiles "/root/cdrom" "LINUXLIVE"
 
 	# umount /mnt/LINUXLIVE
 	echo "installgrub: unmounting LINUXLIVE"
-	umount -v "/mnt/LINUXLIVE"
-	exitonerror $? "Could not umount LINUXLIVE" "/mnt/LINUXLIVE"
+	umountlabel "LINUXLIVE"
 
 	# the LINUXLIVE DEVICE was found
 	# install grub
@@ -289,7 +282,7 @@ copyfiles () {
 
 	# mount LABEL if not already mounted
 	umountlabel "$2"
-	mount -L "$2" "/mnt/$2"
+	mount -v -L "$2" "/mnt/$2"
 	exitonerror "$?" "copyfiles: Could not mount $2 on /mnt/$2" "/mnt/$2"
 
 	# links cannot be copied to a fat32 filesystem
@@ -317,7 +310,7 @@ copyfiles () {
 # LINUXLIVE is formatted with -i 11111111
 # and files copied using copyfiles()
 # grub is not installed from this function
-# no parameters passed
+# parameters passed: format or nothing
 ##########################################################################################
 reinstall() {
 	# check /root/cdrom exists
@@ -334,19 +327,30 @@ reinstall() {
 	DEVICE=`getdevice`
 
 	# LINUXLIVE partition is the first partition
-	mkfs.vfat -v -n LINUXLIVE -i 11111111 "${DEVICE}1"
-	exitonerror $? "Error formatting LINUXLIVE ${DEVICE}1"
+	# use verbose or not
+	if test "${VERBOSE}" = "true"; then
+		mkfs.vfat -v -n LINUXLIVE -i 11111111 "${DEVICE}1"
+		exitonerror $? "Error formatting LINUXLIVE ${DEVICE}1"
+	else
+		# no verbose
+		echo "formatting LINUXLIVE on ${DEVICE}1"
+		mkfs.vfat -n LINUXLIVE -i 11111111 "${DEVICE}1"
+		exitonerror $? "Error formatting LINUXLIVE on ${DEVICE}1"
+	fi
 
-	# also format the writable partition
-	# prompt to see if it should be overwritten
-	echo " "
-	echo " "
-	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-	read -t 20 -p "Format the writable partition? This is only necessary if the version of linux has changed: (yes/no)" ANSWER
-	if test "${ANSWER}" = "yes"; then
+	# also format the writable partition if format was given as a parameter
+	if test "$1" = "format"; then 
 		umountlabel "writable"
-		mkfs.ext4 -v -j -L writable "${DEVICE}2"
-		exitonerror $? "Error formatting writable ${DEVICE}2"
+		# use verbose or not
+		if test "${VERBOSE}" = "true"; then
+			mkfs.ext4 -v -j -L writable "${DEVICE}2"
+			exitonerror $? "Error formatting writable ${DEVICE}2"
+		else
+		# no verbose
+			echo "formatting writable on ${DEVICE}2"
+			mkfs.ext4 -j -L writable "${DEVICE}2"
+			exitonerror $? "Error formatting writable ${DEVICE}2"
+		fi
 	fi
 
 	# copy the latest version of initialise-linux
@@ -415,8 +419,10 @@ mountcopypermissions() {
 # usage function
 usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
-	echo "-i install grub"
-	echo "-r reinstall linux, formats LINUXLIVE and prompts to format writable";
+	echo "-i install grub and copy cdrom files to LINUXLIVE"
+	echo "-I install grub only"
+	echo "-r reinstall linux, formats LINUXLIVE and writable";
+	echo "-R reinstall linux, does not format writable";
 	echo "-m copy MACRIUM files to MACRIUM partition";
 	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
@@ -444,17 +450,21 @@ ISOIMAGE="none"
 CPMACRIUM="false"
 CPMCTREC="false"
 INSTALLGRUB="false"
+INSTALLGRUBCOPY="false"
 VERBOSE="false"
 REINSTALLLINUX="false"
+REINSTALLLINUXFORMAT="false"
 
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts irc:pD:W:M:L:T:mtvh opt
+while getopts iIrRc:pD:W:M:L:T:mtvh opt
 do
 	case ${opt} in
-		i) INSTALLGRUB="true";;
-		r) REINSTALLLINUX="true";;
+		I) INSTALLGRUB="true";;
+		i) INSTALLGRUBCOPY="true";;
+		R) REINSTALLLINUX="true";;
+		r) REINSTALLLINUXFORMAT="true";;
 		c) ISOIMAGE="${OPTARG}";;
 		p) PARTDISK="true";;
 		M) MASIZE="${OPTARG}"; PARTDISK="true";;
@@ -499,10 +509,26 @@ test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "MACRIUM"
 # for mctrec if -t given
 test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "MCTREC"
 
-# reinstall linux if -r given
-test "${REINSTALLLINUX}" = "true" && reinstall
+# reinstall linux if -r given or -R given
+# -r reinstalls linux and formats writable
+# -R reinstalls linux only
+if test "${REINSTALLLINUXFORMAT}" = "true"; then
+	# reinstall and format writable
+	reinstall "format"
+elif test "${REINSTALL}" = "true"; then
+	# reinstall and no format
+	reinstall
+fi
 
 # install grub to the correct device
+# -i install and copies cdrom files
+# -I install grub only
+# -i takes precedence over -I
 # device is in /root/.device which was written by partdisk.pl
 # get the device, if device not found, none is returned
-test "${INSTALLGRUB}" = "true" && installgrub
+if test "${INSTALLGRUBCOPY}" = "true"; then
+	installgrub "copy"
+elif test "${INSTALLGRUB}" = "true"; then
+	# -I given, install grub only
+	installgrub
+fi
