@@ -4,6 +4,7 @@
 # all macrium and microsoft media creation files are to found in /mnt/debhome/livesystem/MACRIUM and MCTREC resp.
 # options for this script are
 # -p partition disk
+# -E size of EFI partiton, default is 1GB -- for partdisk.pl
 # -L size of linuxlive parition, default is 8GB   -- for partdisk.pl
 # -W size of writable partition, default is 10GB  -- for partdisk.pl
 # -M size of MACRIUM partition, default is 2GB     -- for partdisk.pl
@@ -188,7 +189,8 @@ getdistroname () {
 }
 
 # function to copy grub.cfg to /root/cdrom/boot/grub/grub.cfg
-# parameters passed: Flavour name version "Distro Name"
+# parameters passed: 1 Flavour name version "Distro Name"
+#                    2 uuid of LINUXLIVE parition
 # name is obtained from cdrom/.disk/info
 copygrub() {
 	# backup original grub
@@ -207,11 +209,7 @@ menuentry \"Try $1\" {
 
 	insmod part_gpt
 	insmod fat
-	if [ x\$feature_platform_search_hint = xy ]; then
-	  search --no-floppy --fs-uuid --set=root  1111-1111
-	else
-	  search --no-floppy --fs-uuid --set=root 1111-1111
-	fi
+	search --no-floppy --fs-uuid --set=root $2
 
     linux  /casper/vmlinuz  --- username=robert hostname=live persistent persistent-path=/casper/ noprompt
     initrd /casper/initrd
@@ -413,7 +411,7 @@ mountcopypermissions() {
 	echo "distro name: ${DISTRONAME}"
 
 	# copy grub.cfg to /root/cdrom/boot/grub.cfg
-	copygrub "${DISTRONAME}"
+	copygrub "${DISTRONAME}" "${LINUXLIVEUUID}"
 }
 
 # usage function
@@ -421,6 +419,7 @@ usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
 	echo "-i install grub and copy cdrom files to LINUXLIVE"
 	echo "-I install grub only"
+	echo "-U uuid of LINUXLIVE partition, default=${LINUXLIVEUUID}";
 	echo "-r reinstall linux, formats LINUXLIVE and writable";
 	echo "-R reinstall linux, does not format writable";
 	echo "-m copy MACRIUM files to MACRIUM partition";
@@ -455,13 +454,17 @@ VERBOSE="false"
 REINSTALLLINUX="false"
 REINSTALLLINUXFORMAT="false"
 
+# uuid of LINUXLIVE parition p2.
+LINUXLIVEUUID="12345678-1234-1234-1234-123456789012"
+
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts iIrRc:pD:W:M:L:T:mtvh opt
+while getopts iU:IrRc:pD:W:M:L:T:mtvh opt
 do
 	case ${opt} in
 		I) INSTALLGRUB="true";;
+		U) LINUXLIVEUUID="${OPTARG}"; PARTDISK="true";;
 		i) INSTALLGRUBCOPY="true";;
 		R) REINSTALLLINUX="true";;
 		r) REINSTALLLINUXFORMAT="true";;
@@ -484,7 +487,7 @@ done
 
 # if -p or -D or -W or -M given , partition the disk
 if test "${PARTDISK}" = "true"; then
-	/usr/local/bin/partdisk.pl -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
+	/usr/local/bin/partdisk.pl -U "${LINUXLIVEUUID}" -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
 	exitonerror $? "partdisk.pl gave an error ... exiting"
 
 	# copy initialise-linux from local repository to /mnt/writable/upper/root/
