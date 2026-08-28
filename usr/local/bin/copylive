@@ -4,7 +4,7 @@
 # all macrium and microsoft media creation files are to found in /mnt/debhome/livesystem/MACRIUM and MCTREC resp.
 # options for this script are
 # -p partition disk
-# -E size of EFI partiton, default is 1GB -- for partdisk.pl
+# -E size of EFILIVE partiton, default is 1GB -- for partdisk.pl
 # -L size of linuxlive parition, default is 8GB   -- for partdisk.pl
 # -W size of writable partition, default is 10GB  -- for partdisk.pl
 # -M size of MACRIUM partition, default is 2GB     -- for partdisk.pl
@@ -145,24 +145,24 @@ copyinitialise() {
 # if copy is passed then cdrom is copied to LINUXLIVE
 #########################################################################
 installgrub () {
+	# if copy given as first parameter
 	# get device for grub install
 	DEVICE=`getdevice`
 	test "${DEVICE}" = "none" && exitonerror 1 "LINUXLIVE not found: could not install grub"
 
-	# mkdir /mnt/LINUXLIVE if it does not exist
-	test -d "/mnt/LINUXLIVE" || sudo -u "robert" mkdir "/mnt/LINUXLIVE"
+	if test "$1" = "copy"; then
+		# copy cdrom files
+		copyfiles "/root/cdrom" "LINUXLIVE"
 
-	# check for directories: casper  LINUXLIVE
-	test "$1" = "copy" && copyfiles "/root/cdrom" "LINUXLIVE"
-
-	# umount /mnt/LINUXLIVE
-	echo "installgrub: unmounting LINUXLIVE"
-	umountlabel "LINUXLIVE"
+		# copy files
+		copyfiles "/root/EFILIVE" "EFLIVE"
+	fi
 
 	# the LINUXLIVE DEVICE was found
 	# install grub
 	# TESTING
 #	echo "testing: install-grub on ${DEVICE}"
+	echo "installgrub: unmounting LINUXLIVE"
 	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
 	exitonerror $? "Error installing grub"
 }
@@ -194,9 +194,10 @@ getdistroname () {
 # name is obtained from cdrom/.disk/info
 copygrub() {
 	# backup original grub
-	mv -v /root/cdrom/boot/grub/grub.cfg /root/cdrom/boot/grub/grub.cfg.original
-
-	# copy grub.cfg /root/cdrom/boot/grub/grub.cfg
+	mv -v /root/EFILIVE/boot/grub/grub.cfg /root/EFILIVE/boot/grub/grub.cfg.original
+	exitonerror $? "Error moving grub.cfg to grub.cfg.original"
+	
+	# copy grub.cfg /root/EFI/boot/grub/grub.cfg
 echo "set timeout=30
 
 loadfont unicode
@@ -254,7 +255,7 @@ menuentry 'Boot from next volume' {
 menuentry 'UEFI Firmware Settings' {
     fwsetup
 }
-fi" > /root/cdrom/boot/grub/grub.cfg
+fi" > /root/EFILIVE/boot/grub/grub.cfg
 }
 
 ##################################################################################
@@ -276,7 +277,7 @@ copyfiles () {
 	# 1 full source path
 	# 2 label MACRIUM or MCTREC or LINUXLIVE for file type
  
-	test -d "/mnt/$2" || mkdir "/mnt/$2"
+	test -d "/mnt/$2" || sudo -u "robert" mkdir "/mnt/$2"
 
 	# mount LABEL if not already mounted
 	umountlabel "$2"
@@ -362,6 +363,8 @@ reinstall() {
 ##################################################################
 # function to mount cdrom, copy files
 # to /root/cdrom and set the file permissions
+# cdrom/EFI and cdrom/boot are moved to /root/EFILIVE
+# so that cp -T can be used for each partition
 # parameters passed: isoimage name
 ##################################################################
 mountcopypermissions() {
@@ -385,24 +388,41 @@ mountcopypermissions() {
 	# delete it
 	test -d /root/cdrom && rm -rf /root/cdrom
 
-	# copy cdrom files to root
-	echo "copying /mnt/cdrom -> /root"
+	# if /root/EFI exsts delete it
+	test -d /root/EFILIVE && rm -rf /root/EFILIVE
+
+	# make directory /root/EFI if it does not exist
+	mkdir "/root/EFILIVE"
+
 
 	if test "${VERBOSE}" = "true"; then
+		# copy cdrom files to root
+		echo "copying /mnt/cdrom -> /root"
 		cp -dR -v /mnt/cdrom /root/
-
 		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
+		# set file and directory permissions
+		find /root/cdrom -type f -exec chmod a+w {} \;
+		find /root/cdrom -type d -exec chmod 755 {} \;
+		# now move cdrom/EFI and cdrom/boot to /root/EFI
+		echo "moving cdrom/EFI and cdrom/boot to /root/EFILIVE"
+		mv  -v /root/cdrom/EFI /root/cdrom/boot /root/EFILIVE/
+		exitonerror $? "Error moving EFI and boot to /root/EFILIVE"
 	else
+		# copy cdrom files to root
+		echo "copying /mnt/cdrom -> /root"
 		cp -dR /mnt/cdrom /root
 		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
+		# set file and directory permissions
+		find /root/cdrom -type f -exec chmod a+w {} \;
+		find /root/cdrom -type d -exec chmod 755 {} \;
+		# now move cdrom/EFI and cdrom/boot to /root/EFI
+		echo "moving cdrom/EFI and cdrom/boot to /root/EFILIVE"
+		mv  /root/cdrom/EFI /root/cdrom/boot /root/EFILIVE/
+		exitonerror $? "Error moving EFI and boot to /root/EFILIVE"
 	fi
 
 	umount "/mnt/cdrom"
 	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
-
-	# set file and directory permissions
-	find /root/cdrom -type f -exec chmod a+w {} \;
-	find /root/cdrom -type d -exec chmod 755 {} \;
 
 	# get distro name from /mnt/cdrom/.disk/info
 	DISTRONAME=`getdistroname`;
@@ -425,6 +445,7 @@ usage() {
 	echo "-m copy MACRIUM files to MACRIUM partition";
 	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
+	echo "-E size in GB of EFILIVE partition, default = ${EFISIZE}GB";
 	echo "-M size in GB of MACRIUM parition, default = ${MASIZE}GB";
 	echo "-L size in GB of LINUXLIVE partition, default = ${LLIVESIZE}GB";
 	echo "-W size in GB of writable partition, default = ${WSIZE}GB";
@@ -440,6 +461,7 @@ usage() {
 # set partition disk to false, unless -p or -D or -W or -M passed
 PARTDISK="false"
 # default values for partdisk.pl in GB
+EFISIZE=2;
 LLIVESIZE=8;
 WSIZE=10;
 MCTSIZE=8;
@@ -465,6 +487,7 @@ do
 	case ${opt} in
 		I) INSTALLGRUB="true";;
 		U) LINUXLIVEUUID="${OPTARG}"; PARTDISK="true";;
+		E) EFISIZE="${OPTARG}";;
 		i) INSTALLGRUBCOPY="true";;
 		R) REINSTALLLINUX="true";;
 		r) REINSTALLLINUXFORMAT="true";;
@@ -487,7 +510,7 @@ done
 
 # if -p or -D or -W or -M given , partition the disk
 if test "${PARTDISK}" = "true"; then
-	/usr/local/bin/partdisk.pl -U "${LINUXLIVEUUID}" -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
+	/usr/local/bin/partdisk.pl -E "${EFISIZE}" -U "${LINUXLIVEUUID}" -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
 	exitonerror $? "partdisk.pl gave an error ... exiting"
 
 	# copy initialise-linux from local repository to /mnt/writable/upper/root/
@@ -524,7 +547,7 @@ elif test "${REINSTALLLINUX}" = "true"; then
 fi
 
 # install grub to the correct device
-# -i install and copies cdrom files
+# -i install and copies cdrom  EFI files
 # -I install grub only
 # -i takes precedence over -I
 # device is in /root/.device which was written by partdisk.pl

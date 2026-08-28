@@ -49,7 +49,7 @@ sub getsize {
 ######################################################
 ######################################################
 # sub to delete all partitions and make a
-# partition 1: default=200M	fat32 for EFI
+# partition 1: default=200M	fat32 for EFILIVE
 # partition 2: default=8G  ext4 LINUXLIVE
 # partition 3: default=10G  ext4 writable
 # partition 4: default=2G fat32 MACRIUM
@@ -115,7 +115,7 @@ sub partitiondisk {
 	if ($answer =~ /^yes$/i) {
 		print "partitioning $device\n";
 
-		# partition 1: EFI partition fat32
+		# partition 1: EFILIVE partition fat32
 		# partition 2: LINUXLIVE parition ext4
 		# partition 3: writable partition ext4 for persistence
 		# partition 4: MACRIUM partition fat32 size is passed as a parameter to this sub
@@ -158,9 +158,9 @@ sub partitiondisk {
 		# if partition size is bigger than 12GB
 		sleep 2;
 
-		# format partition 1 EFI
+		# format partition 1 EFILIVE
 		print "formatting partition " . $device . "1\n";
-		$rc = system( "mkfs.vfat -v -n EFI " . $device . "1");
+		$rc = system( "mkfs.vfat -v -n EFILIVE " . $device . "1");
 		die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
 
 		# format parition 2 LINUXLIVE
