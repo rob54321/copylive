@@ -94,11 +94,12 @@ umountlabel () {
 	# p 5 ele
 	# all are on the same device
 	case $1 in
-		LINUXLIVE) p=1;;
-		writable)  p=2;;
-		MACRIUM)   p=3;;
-		MCTREC)    p=4;;
-		ele)       p=5;;
+		EFILIVE)   p=1;;
+		LINUXLIVE) p=2;;
+		writable)  p=3;;
+		MACRIUM)   p=4;;
+		MCTREC)    p=5;;
+		ele)       p=6;;
 		*)         exitonerror 1 "Unknown option for umountlabel(): $1";;
 	esac
 	PARTITION="${DEVICE}${p}"
@@ -155,14 +156,13 @@ installgrub () {
 		copyfiles "/root/cdrom" "LINUXLIVE"
 
 		# copy files
-		copyfiles "/root/EFILIVE" "EFLIVE"
+		copyfiles "/root/EFILIVE" "EFILIVE"
 	fi
 
 	# the LINUXLIVE DEVICE was found
 	# install grub
 	# TESTING
-#	echo "testing: install-grub on ${DEVICE}"
-	echo "installgrub: unmounting LINUXLIVE"
+	echo "install-grub on ${DEVICE}"
 	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
 	exitonerror $? "Error installing grub"
 }
