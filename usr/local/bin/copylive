@@ -210,9 +210,10 @@ menuentry \"Try $1\" {
 
 	insmod part_gpt
 	insmod fat
+	insmod ext2
 	search --no-floppy --fs-uuid --set=root $2
 
-    linux  /casper/vmlinuz  --- username=robert hostname=live persistent persistent-path=/casper/ noprompt
+    linux  /casper/vmlinuz  --- username=robert hostname=live persistent persistent-path=/casper/ noprompt vt.cur_default=8
     initrd /casper/initrd
 }
 menuentry \"$1 (safe graphics)\" {
