@@ -1,5 +1,5 @@
 Package: copylive
-Version: 1.2.0
+Version: 1.2.1
 Architecture: all
 Maintainer: Robert Key robkey@mighty.co.za
 Depends: perl
