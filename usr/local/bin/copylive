@@ -87,11 +87,12 @@ umountlabel () {
 	# set the partition number to be un mounted
 
 	# the partitions are numbered as follows:
-	# p 1 LINUXLIVE
-	# p 2 writable
-	# p 3 MACRIUM
-	# p 4 MCTREC
-	# p 5 ele
+	# p 1 EFILIVE
+	# p 2 LINUXLIVE
+	# p 3 writable
+	# p 4 MACRIUM
+	# p 5 MCTREC
+	# p 6 ele
 	# all are on the same device
 	case $1 in
 		EFILIVE)   p=1;;
@@ -112,7 +113,7 @@ umountlabel () {
 				chomp(@list);
 				for (my $i=1; $i<scalar(@list); $i++) {
 					# umount all
-					system("umount -v $list[$i]");
+					system("umount \${VERBOSE:+\"-v\"} $list[$i]");
 				}' "${PARTITION}";
 }
 
@@ -124,19 +125,18 @@ umountlabel () {
 copyinitialise() {
 	# copy initialise-linux package to /mnt/writable/upper/root/
 	# check if /mnt/writable exists
-	test -d /mnt/writable || sudo -u robert mkdir /mnt/writable
+	test -d /mnt/writable || sudo -u robert mkdir ${VERBOSE:+"-v"} /mnt/writable
 
 	# check writable is not mounted elswhere
 	umountlabel "writable"
-
 	# mount writable and copy initialise-linux
-	mount -L writable /mnt/writable
+	mount ${VERBOSE:+"-v"} -L writable /mnt/writable
 	exitonerror $? "Could not mount /mnt/writable" "/mnt/writable"
-	mkdir -p /mnt/writable/upper/root/
+	mkdir ${VERBOSE:+"-v"} -p /mnt/writable/upper/root/
 	exitonerror $? "Could not make directory /mnt/writable/upper/root" "/mnt/writable"
-	cp -v /mnt/debhome/pool/myown/i/initialise-linux/*.deb /mnt/writable/upper/root/
+	cp ${VERBOSE:+"-v"} /mnt/debhome/pool/myown/i/initialise-linux/*.deb /mnt/writable/upper/root/
 	exitonerror $? "Could not copy initialise-linux to /mnt/writable/upper/root/" "/mnt/writable"
-	umount /mnt/writable
+	umount ${VERBOSE:+"-v"} /mnt/writable
 	exitonerror $? "Could not umount /mnt/writable"
 }
 
@@ -162,9 +162,9 @@ installgrub () {
 	# the LINUXLIVE DEVICE was found
 	# install grub
 	# TESTING
-	echo "install-grub on ${DEVICE}"
-	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
-	exitonerror $? "Error installing grub"
+	echo "install-grub ${VERBOSE:+"-v"} on ${DEVICE}"
+#	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
+#	exitonerror $? "Error installing grub"
 }
 
 
@@ -194,7 +194,7 @@ getdistroname () {
 # name is obtained from cdrom/.disk/info
 copygrub() {
 	# backup original grub
-	mv -v /root/EFILIVE/boot/grub/grub.cfg /root/EFILIVE/boot/grub/grub.cfg.original
+	mv ${VERBOSE:+"-v"} /root/EFILIVE/boot/grub/grub.cfg /root/EFILIVE/boot/grub/grub.cfg.original
 	exitonerror $? "Error moving grub.cfg to grub.cfg.original"
 	
 	# copy grub.cfg /root/EFI/boot/grub/grub.cfg
@@ -218,6 +218,11 @@ menuentry \"Try $1\" {
 }
 menuentry \"$1 (safe graphics)\" {
     set gfxpayload=keep
+
+	insmod part_gpt
+	insmod fat
+	insmod ext2
+	search --no-floppy --fs-uuid --set=root $2
     linux  /casper/vmlinuz nomodeset  --- quiet splash
     initrd /casper/initrd
 }
@@ -267,22 +272,23 @@ fi" > /root/EFILIVE/boot/grub/grub.cfg
 #                   2. LABEL of partition
 ##################################################################################
 copyfiles () {
-	# mount MCTREC and LINUXLIVE partitions and
-	# copy files for macrium and mctrec from
-	# /mnt/debhome/livesystem/MACRIUM and /mnt/debhome/livesystem/MCTREC
-	# to /mnt/MCTREC and /mnt/LINUXLIVE.
-	# un mount /mnt/MCTREC and /mnt/LINUXLIVE
-	# NOTE: MACRIUM files are copied to LINUXLIVE before the LINUX live files.
-
+	# umounts device
+	# mounts device
+	# if /mnt/$2 contains files remove all files first
+	# if $2 is LINUXLIVE also prompt to remove files from writable
+	# copies files from $1 -> /mnt/$2
+	# exits on any errors
+	#
 	# parameters passed:
 	# 1 full source path
-	# 2 label MACRIUM or MCTREC or LINUXLIVE for file type
+	# 2 label MACRIUM or MCTREC or LINUXLIVE/EFILIVE for file type
  
+	# make the mount directory if it does not exist
 	test -d "/mnt/$2" || sudo -u "robert" mkdir "/mnt/$2"
 
 	# mount LABEL if not already mounted
 	umountlabel "$2"
-	mount -v -L "$2" "/mnt/$2"
+	mount ${VERBOSE:+"-v"} -L "$2" "/mnt/$2"
 	exitonerror "$?" "copyfiles: Could not mount $2 on /mnt/$2" "/mnt/$2"
 
 	# links cannot be copied to a fat32 filesystem
@@ -292,13 +298,9 @@ copyfiles () {
 	# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
 	echo "copying $1 -> /mnt/$2"
 
-	if test "${VERBOSE}" = "true"; then
-		cp -dR -T -v "$1" "/mnt/$2"
-		exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
-	else
-		cp -dR -T "$1" "/mnt/$2"
-		exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
-	fi
+
+	cp -dR -T ${VERBOSE:+"-v"} "$1" "/mnt/$2"
+	exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
 	# umount device which must be in fstab
 	umountlabel "$2"
 }
@@ -377,50 +379,36 @@ mountcopypermissions() {
 	# since the wrong one may be mounted
 	findmnt /mnt/cdrom > /dev/null 2>&1
 	if test "$?" -eq 0; then
-		umount -v "/mnt/cdrom"
+		umount ${VERBOSE:+"-v"} "/mnt/cdrom"
 		exitonerror $? "Error umounting $1"
 	fi
 
 	# mount the cdrom
-	mount "$1" /mnt/cdrom -o ro
+	mount ${VERBOSE:+"-v"} "$1" /mnt/cdrom -o ro
 	exitonerror $? "Could not mount $1 on /mnt/cdrom" "/mnt/cdrom"
 
 	# if /root/cdrom exists
 	# delete it
-	test -d /root/cdrom && rm -rf /root/cdrom
+	test -d /root/cdrom && rm ${VERBOSE:+"-v"} -rf /root/cdrom
 
 	# if /root/EFI exsts delete it
-	test -d /root/EFILIVE && rm -rf /root/EFILIVE
+	test -d /root/EFILIVE && rm ${VERBOSE:+"-v"} -rf /root/EFILIVE
 
-	# make directory /root/EFI if it does not exist
-	mkdir "/root/EFILIVE"
+	# make directory /root/EFI
+	mkdir ${VERBOSE:+"-v"} "/root/EFILIVE"
 
 
-	if test "${VERBOSE}" = "true"; then
-		# copy cdrom files to root
-		echo "copying /mnt/cdrom -> /root"
-		cp -dR -v /mnt/cdrom /root/
-		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
-		# set file and directory permissions
-		find /root/cdrom -type f -exec chmod a+w {} \;
-		find /root/cdrom -type d -exec chmod 755 {} \;
-		# now move cdrom/EFI and cdrom/boot to /root/EFI
-		echo "moving cdrom/EFI and cdrom/boot to /root/EFILIVE"
-		mv  -v /root/cdrom/EFI /root/cdrom/boot /root/EFILIVE/
-		exitonerror $? "Error moving EFI and boot to /root/EFILIVE"
-	else
-		# copy cdrom files to root
-		echo "copying /mnt/cdrom -> /root"
-		cp -dR /mnt/cdrom /root
-		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
-		# set file and directory permissions
-		find /root/cdrom -type f -exec chmod a+w {} \;
-		find /root/cdrom -type d -exec chmod 755 {} \;
-		# now move cdrom/EFI and cdrom/boot to /root/EFI
-		echo "moving cdrom/EFI and cdrom/boot to /root/EFILIVE"
-		mv  /root/cdrom/EFI /root/cdrom/boot /root/EFILIVE/
-		exitonerror $? "Error moving EFI and boot to /root/EFILIVE"
-	fi
+	# copy cdrom files to root
+	echo "copying /mnt/cdrom -> /root"
+	cp -dR ${VERBOSE:+"-v"} /mnt/cdrom /root/
+	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
+	# set file and directory permissions
+	find /root/cdrom -type f -exec chmod a+w {} \;
+	find /root/cdrom -type d -exec chmod 755 {} \;
+	# now move cdrom/EFI and cdrom/boot to /root/EFI
+	echo "moving cdrom/EFI and cdrom/boot to /root/EFILIVE"
+	mv ${VERBOSE:+"-v"} /root/cdrom/EFI /root/cdrom/boot /root/EFILIVE/
+	exitonerror $? "Error moving EFI and boot to /root/EFILIVE"
 
 	umount "/mnt/cdrom"
 	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
@@ -473,7 +461,9 @@ CPMACRIUM="false"
 CPMCTREC="false"
 INSTALLGRUB="false"
 INSTALLGRUBCOPY="false"
-VERBOSE="false"
+# VERBOSE must not be set for absence of -v
+# if it is set to anything, -v will be used
+VERBOSE=
 REINSTALLLINUX="false"
 REINSTALLLINUXFORMAT="false"
 
@@ -511,9 +501,8 @@ done
 
 # if -p or -D or -W or -M given , partition the disk
 if test "${PARTDISK}" = "true"; then
-	/usr/local/bin/partdisk.pl -E "${EFISIZE}" -U "${LINUXLIVEUUID}" -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
+	/usr/local/bin/partdisk.pl ${VERBOSE:+"-v"} -E "${EFISIZE}" -U "${LINUXLIVEUUID}" -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
 	exitonerror $? "partdisk.pl gave an error ... exiting"
-
 	# copy initialise-linux from local repository to /mnt/writable/upper/root/
 	copyinitialise
 fi

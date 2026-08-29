@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Getopt::Std;
 
-our ($opt_h, $opt_U, $opt_E, $opt_L, $opt_T, $opt_W, $opt_M);
+our ($opt_v, $opt_h, $opt_U, $opt_E, $opt_L, $opt_T, $opt_W, $opt_M);
 
 # default sizes for the paritions
 # LINUXLIVE partition 1 UUID for grub.cfg
@@ -18,6 +18,10 @@ my $mctrecsize = 8;
 
 # uuid for LINUXLIVE partition
 my $uuid = "12345678-1234-1234-1234-123456789012";
+# option for verbose
+my $opt = "";
+# option for non verbose on ext4
+my $optext4 = "-q";
 
 # help message
 sub usage {
@@ -27,6 +31,7 @@ sub usage {
 	print "-M size of MACRIUM partition in GB default is $macriumsize " . "GB fat32\n";
 	print "-T size of MCTREC partition in GB default is $mctrecsize ". "GB fat32\n";
 	print "-U uuid of LINUXLIVE partition: format hex digits: $linuxliveuuid\n";
+	print "-v verbose operation";
 	print "-h display this usage\n";
 	exit 0;
 }
@@ -159,34 +164,46 @@ sub partitiondisk {
 		sleep 2;
 
 		# format partition 1 EFILIVE
-		print "formatting partition " . $device . "1\n";
-		$rc = system( "mkfs.vfat -v -n EFILIVE " . $device . "1");
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
+		print "formatting partition EFILIVE " . $device . "1\n";
+		$rc = system( "mkfs.vfat $opt -n EFILIVE " . $device . "1");
 		die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 		# format parition 2 LINUXLIVE
-		print "formatting partition " . $device . "2\n";
-		$rc = system("mkfs.ext4 -v -j -L LINUXLIVE -U $linuxliveuuid " . $device . "2");
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
+		print "formatting partition LINUXLIVE " . $device . "2\n";
+		$rc = system("mkfs.ext4 $opt $optext4 -j -L LINUXLIVE -U $linuxliveuuid " . $device . "2");
 		die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 		# format parition 3 writable
-		print "formatting partition " . $device . "3\n";
-		$rc = system("mkfs.ext4 -v -j -L writable " . $device . "3");
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
+		print "formatting partition writable " . $device . "3\n";
+		$rc = system("mkfs.ext4 $opt $optext4 -j -L writable " . $device . "3");
 		die "aborting: error formatting " . $device . "3\n" unless $rc == 0;
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 		# format partition 4 MACRIUM
-		print "formatting partition " . $device . "4\n";
-		$rc = system( "mkfs.vfat -v -n MACRIUM -i AED6434E " . $device . "4");
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
+		print "formatting partition MACRIUM " . $device . "4\n";
+		$rc = system( "mkfs.vfat $opt -n MACRIUM -i AED6434E " . $device . "4");
 		die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 		# format partition 5 MCTREC
-		print "formatting partition " . $device . "5\n";
-		$rc = system("mkfs.vfat -v -n MCTREC -i 44444444 " . $device . "5");
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
+		print "formatting partition MCTREC " . $device . "5\n";
+		$rc = system("mkfs.vfat $opt -n MCTREC -i 44444444 " . $device . "5");
 		die "aborting: error formatting " . $device . "5\n" unless $rc == 0;
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 		# format parition 6 ele
-		print "formatting partition " . $device . "6\n";
-		$rc = system("mkfs.ntfs -v -Q -L ele  " . $device . "6");
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
+		print "formatting partition ele " . $device . "6\n";
+		$rc = system("mkfs.ntfs $opt -Q -L ele  " . $device . "6");
 		die "aborting: error formatting " . $device . "6\n" unless $rc == 0;
+		print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 	} else {
 		print "$device was not partitioned\n";
@@ -204,11 +221,20 @@ sub partitiondisk {
 # -M is size of  MACRIUM partition in GB default is 2GB
 # -T is size of MCRECT partition in GB default is 8GB
 # -U is for the uuid of the LINUXLIVE partition
+# -v verbose option
+
 # set defaults in GB
-getopts('U:E:L:D:W:M:T:h');
+getopts('vU:E:L:D:W:M:T:h');
 
 # display help and exit if -h given
 usage () if $opt_h;
+
+# set verbose option if given
+# for ext4 -q must be removed if -v given
+if ($opt_v) {
+	$opt = "-v";
+	$optext4 = "";
+}
 
 # set uuid if given
 $linuxliveuuid = $opt_U if $opt_U;
