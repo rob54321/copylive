@@ -196,7 +196,7 @@ copygrub() {
 	# backup original grub
 	mv ${VERBOSE:+"-v"} /root/EFILIVE/boot/grub/grub.cfg /root/EFILIVE/boot/grub/grub.cfg.original
 	exitonerror $? "Error moving grub.cfg to grub.cfg.original"
-	
+
 	# copy grub.cfg /root/EFI/boot/grub/grub.cfg
 echo "set timeout=30
 
@@ -282,7 +282,7 @@ copyfiles () {
 	# parameters passed:
 	# 1 full source path
 	# 2 label MACRIUM or MCTREC or LINUXLIVE/EFILIVE for file type
- 
+
 	# make the mount directory if it does not exist
 	test -d "/mnt/$2" || sudo -u "robert" mkdir "/mnt/$2"
 
@@ -299,7 +299,7 @@ copyfiles () {
 	echo "copying $1 -> /mnt/$2"
 
 
-	cp -dR -T ${VERBOSE:+"-v"} "$1" "/mnt/$2"
+	cp -dR -T ${EXTRAVERBOSE:+"-v"} "$1" "/mnt/$2"
 	exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
 	# umount device which must be in fstab
 	umountlabel "$2"
@@ -400,14 +400,14 @@ mountcopypermissions() {
 
 	# copy cdrom files to root
 	echo "copying /mnt/cdrom -> /root"
-	cp -dR ${VERBOSE:+"-v"} /mnt/cdrom /root/
+	cp -dR ${EXTRAVERBOSE:+"-v"} /mnt/cdrom /root/
 	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
 	# set file and directory permissions
 	find /root/cdrom -type f -exec chmod a+w {} \;
 	find /root/cdrom -type d -exec chmod 755 {} \;
 	# now move cdrom/EFI and cdrom/boot to /root/EFI
 	echo "moving cdrom/EFI and cdrom/boot to /root/EFILIVE"
-	mv ${VERBOSE:+"-v"} /root/cdrom/EFI /root/cdrom/boot /root/EFILIVE/
+	mv ${EXTRAVERBOSE:+"-v"} /root/cdrom/EFI /root/cdrom/boot /root/EFILIVE/
 	exitonerror $? "Error moving EFI and boot to /root/EFILIVE"
 
 	umount "/mnt/cdrom"
@@ -439,7 +439,8 @@ usage() {
 	echo "-L size in GB of LINUXLIVE partition, default = ${LLIVESIZE}GB";
 	echo "-W size in GB of writable partition, default = ${WSIZE}GB";
 	echo "-T size in GB of MCTREC partition, default = ${MCTSIZE}GB";
-	echo "-v verbose copying"
+	echo "-v verbose for everything except file copy/move"
+	echo "-V verbose for everything"
 	exit 0;
 }
 
@@ -464,6 +465,8 @@ INSTALLGRUBCOPY="false"
 # VERBOSE must not be set for absence of -v
 # if it is set to anything, -v will be used
 VERBOSE=
+# EXTRAVERBOSE is used to display verbose for copying of files as well"
+EXTRAVERBOSE=
 REINSTALLLINUX="false"
 REINSTALLLINUXFORMAT="false"
 
@@ -473,7 +476,7 @@ LINUXLIVEUUID="12345678-1234-1234-1234-123456789012"
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts iU:IrRc:pD:W:M:L:T:mtvh opt
+while getopts iU:IrRc:pD:W:M:L:T:mtvVh opt
 do
 	case ${opt} in
 		I) INSTALLGRUB="true";;
@@ -491,6 +494,7 @@ do
 		m) CPMACRIUM="true";;
 		t) CPMCTREC="true";;
 		v) VERBOSE="true";;
+		V) EXTRAVERBOSE="true"; VERBOSE="true";;
 		h) usage;;
 		\?) usage;;
 	esac
