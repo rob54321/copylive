@@ -378,8 +378,6 @@ usage() {
 	echo "-i install grub and copy cdrom files to LINUXLIVE"
 	echo "-I install grub only"
 	echo "-U uuid of LINUXLIVE partition, default=${LINUXLIVEUUID}";
-	echo "-r reinstall linux, formats LINUXLIVE and writable";
-	echo "-R reinstall linux, does not format writable";
 	echo "-m copy MACRIUM files to MACRIUM partition";
 	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
