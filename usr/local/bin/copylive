@@ -337,7 +337,8 @@ mountcopypermissions() {
 	cp -dR ${EXTRAVERBOSE:+"-v"} /mnt/cdrom /root/
 	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
 	# umount /mnt/cdrom
-	umountlabel "cdrom"
+	umount ${VERBOSE:+"-v"} "/mnt/cdrom"
+	exitonerror $? "Could not umount /mnt/cdrom" "/mnt/cdrom"
 
 	# set file and directory permissions
 	find /root/cdrom -type f -exec chmod ${EXTRAVERBOSE:+"-v"} a+w {} \;
