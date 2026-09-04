@@ -195,10 +195,10 @@ getdistroname () {
 # name is obtained from cdrom/.disk/info
 copygrub() {
 	# backup original grub
-	mv ${VERBOSE:+"-v"} /root/EFILIVE/boot/grub/grub.cfg /root/EFILIVE/boot/grub/grub.cfg.original
+	mv ${VERBOSE:+"-v"} /root/cdrom/boot/grub/grub.cfg /root/cdrom/boot/grub/grub.cfg.original
 	exitonerror $? "Error moving grub.cfg to grub.cfg.original"
 
-	# copy grub.cfg /root/EFI/boot/grub/grub.cfg
+	# copy grub.cfg /root/cdrom/boot/grub/grub.cfg
 echo "set timeout=30
 
 loadfont unicode
@@ -331,20 +331,14 @@ mountcopypermissions() {
 	# delete it
 	test -d /root/cdrom && rm ${EXTRAVERBOSE:+"-v"} -rf /root/cdrom
 
-	# if /root/EFI exsts delete it
-	test -d /root/EFILIVE && rm ${EXTRAVERBOSE:+"-v"} -rf /root/EFILIVE
-
-	# make directory /root/EFI
-	mkdir ${VERBOSE:+"-v"} "/root/EFILIVE"
-
 
 	# copy cdrom files to root
 	echo "copying /mnt/cdrom -> /root"
 	cp -dR ${EXTRAVERBOSE:+"-v"} /mnt/cdrom /root/
 	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
 	# set file and directory permissions
-	find /root/cdrom -type f -exec chmod a+w {} \;
-	find /root/cdrom -type d -exec chmod 755 {} \;
+	find /root/cdrom -type f -exec chmod ${VERBOSE:+"-v"} a+w {} \;
+	find /root/cdrom -type d -exec chmod ${VERBOSE:+"-v"} 755 {} \;
 
 	# get distro name from /mnt/cdrom/.disk/info
 	DISTRONAME=`getdistroname`;
