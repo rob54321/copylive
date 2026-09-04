@@ -103,15 +103,22 @@ umountlabel () {
 	PARTITION="${DEVICE}${p}"
 
 	# get a list of mount points for the partition
-	# unmount all of them
-	perl -e 'use strict; use warnings;
+	# unmount all of them,
+	# the bash parameters are partition_no and true/null for verbose/quiet
+	RESULT=$(perl -e 'use strict; use warnings;
 				my $partition = shift;
+				my $verbose = shift;
 				my @list = `findmnt -o TARGET $partition`;
 				chomp(@list);
 				for (my $i=1; $i<scalar(@list); $i++) {
 					# umount all
-					system("umount -v $list[$i]");
-				}' "${PARTITION}";
+					if ($verbose eq "true") {
+						system("umount -v $list[$i]");
+					} else {
+						system("umount $list[$i]");
+					}
+				}' "${PARTITION}" "${VERBOSE}";)
+	echo "${RESULT}";
 }
 
 #############################################################################################
@@ -122,19 +129,18 @@ umountlabel () {
 copyinitialise() {
 	# copy initialise-linux package to /mnt/writable/upper/root/
 	# check if /mnt/writable exists
-	test -d /mnt/writable || sudo -u robert mkdir /mnt/writable
+	test -d /mnt/writable || sudo -u robert mkdir ${VERBOSE:+"-v"} /mnt/writable
 
 	# check writable is not mounted elswhere
 	umountlabel "writable"
-
 	# mount writable and copy initialise-linux
-	mount -L writable /mnt/writable
+	mount ${VERBOSE:+"-v"} -L writable /mnt/writable
 	exitonerror $? "Could not mount /mnt/writable" "/mnt/writable"
-	mkdir -p /mnt/writable/upper/root/
+	mkdir ${VERBOSE:+"-v"} -p /mnt/writable/upper/root/
 	exitonerror $? "Could not make directory /mnt/writable/upper/root" "/mnt/writable"
-	cp -v /mnt/debhome/pool/myown/i/initialise-linux/*.deb /mnt/writable/upper/root/
+	cp ${VERBOSE:+"-v"} /mnt/debhome/pool/myown/i/initialise-linux/*.deb /mnt/writable/upper/root/
 	exitonerror $? "Could not copy initialise-linux to /mnt/writable/upper/root/" "/mnt/writable"
-	umount /mnt/writable
+	umount ${VERBOSE:+"-v"} /mnt/writable
 	exitonerror $? "Could not umount /mnt/writable"
 }
 
@@ -144,25 +150,21 @@ copyinitialise() {
 # if copy is passed then cdrom is copied to LINUXLIVE
 #########################################################################
 installgrub () {
+	# if copy given as first parameter
 	# get device for grub install
 	DEVICE=`getdevice`
 	test "${DEVICE}" = "none" && exitonerror 1 "LINUXLIVE not found: could not install grub"
 
-	# mkdir /mnt/LINUXLIVE if it does not exist
-	test -d "/mnt/LINUXLIVE" || sudo -u "robert" mkdir "/mnt/LINUXLIVE"
-
-	# check for directories: casper  LINUXLIVE
-	test "$1" = "copy" && copyfiles "/root/cdrom" "LINUXLIVE"
-
-	# umount /mnt/LINUXLIVE
-	echo "installgrub: unmounting LINUXLIVE"
-	umountlabel "LINUXLIVE"
+	if test "$1" = "copy"; then
+		# copy cdrom files
+		copyfiles "/root/cdrom" "LINUXLIVE"
+	fi
 
 	# the LINUXLIVE DEVICE was found
 	# install grub
 	# TESTING
-#	echo "testing: install-grub on ${DEVICE}"
-	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
+	echo "install-grub ${VERBOSE:+"-v"} on ${DEVICE}"
+#	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
 	exitonerror $? "Error installing grub"
 }
 
@@ -188,13 +190,15 @@ getdistroname () {
 }
 
 # function to copy grub.cfg to /root/cdrom/boot/grub/grub.cfg
-# parameters passed: Flavour name version "Distro Name"
+# parameters passed: 1 Flavour name version "Distro Name"
+#                    2 uuid of LINUXLIVE parition
 # name is obtained from cdrom/.disk/info
 copygrub() {
 	# backup original grub
-	mv -v /root/cdrom/boot/grub/grub.cfg /root/cdrom/boot/grub/grub.cfg.original
+	mv ${VERBOSE:+"-v"} /root/EFILIVE/boot/grub/grub.cfg /root/EFILIVE/boot/grub/grub.cfg.original
+	exitonerror $? "Error moving grub.cfg to grub.cfg.original"
 
-	# copy grub.cfg /root/cdrom/boot/grub/grub.cfg
+	# copy grub.cfg /root/EFI/boot/grub/grub.cfg
 echo "set timeout=30
 
 loadfont unicode
@@ -213,7 +217,7 @@ menuentry \"Try $1\" {
 	  search --no-floppy --fs-uuid --set=root 1111-1111
 	fi
 
-    linux  /casper/vmlinuz  --- username=robert hostname=live persistent persistent-path=/casper/ noprompt
+    linux  /casper/vmlinuz  --- username=robert hostname=live persistent persistent-path=/casper/ noprompt vt.cur_default=8
     initrd /casper/initrd
 }
 menuentry \"$1 (safe graphics)\" {
@@ -277,88 +281,28 @@ copyfiles () {
 	# parameters passed:
 	# 1 full source path
 	# 2 label MACRIUM or MCTREC or LINUXLIVE for file type
- 
-	test -d "/mnt/$2" || mkdir "/mnt/$2"
+
+	# make the mount directory if it does not exist
+	test -d "/mnt/$2" || sudo -u "robert" mkdir ${VERBOSE:+"-v"} "/mnt/$2"
 
 	# mount LABEL if not already mounted
 	umountlabel "$2"
-	mount -v -L "$2" "/mnt/$2"
+	mount ${VERBOSE:+"-v"} -L "$2" "/mnt/$2"
 	exitonerror "$?" "copyfiles: Could not mount $2 on /mnt/$2" "/mnt/$2"
 
 	# links cannot be copied to a fat32 filesystem
 	# delete all links
-	find "$1" -type l -exec rm -v {} \;
+	find "$1" -type l -exec rm ${VERBOSE:+"-v"} {} \;
 
 	# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
 	echo "copying $1 -> /mnt/$2"
 
-	if test "${VERBOSE}" = "true"; then
-		cp -dR -T -v "$1" "/mnt/$2"
-		exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
-	else
-		cp -dR -T "$1" "/mnt/$2"
-		exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
-	fi
+
+	cp -dR -T ${EXTRAVERBOSE:+"-v"} "$1" "/mnt/$2"
+	exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
+
 	# umount device which must be in fstab
 	umountlabel "$2"
-}
-
-##########################################################################################
-# function to reinstall linux on LINUXLIVE parition
-# cdrom must exist in /mnt/cdrom
-# disk must be partitioned
-# LINUXLIVE is formatted with -i 11111111
-# and files copied using copyfiles()
-# grub is not installed from this function
-# parameters passed: format or nothing
-##########################################################################################
-reinstall() {
-	# check /root/cdrom exists
-	test -d "/root/cdrom/casper"
-	exitonerror $? "/root/cdrom does not exist..exiting"
-
-	# check if directory /mnt/LINUXLIVE exists
-	test -d "/mnt/LINUXLIVE" || mkdir "/mnt/LINUXLIVE"
-
-	# umount parititon incase it is mounted
-	umountlabel "LINUXLIVE"
-
-	# get the LINUXLIVE device for formatting
-	DEVICE=`getdevice`
-
-	# LINUXLIVE partition is the first partition
-	# use verbose or not
-	if test "${VERBOSE}" = "true"; then
-		mkfs.vfat -v -n LINUXLIVE -i 11111111 "${DEVICE}1"
-		exitonerror $? "Error formatting LINUXLIVE ${DEVICE}1"
-	else
-		# no verbose
-		echo "formatting LINUXLIVE on ${DEVICE}1"
-		mkfs.vfat -n LINUXLIVE -i 11111111 "${DEVICE}1"
-		exitonerror $? "Error formatting LINUXLIVE on ${DEVICE}1"
-	fi
-
-	# also format the writable partition if format was given as a parameter
-	if test "$1" = "format"; then 
-		umountlabel "writable"
-		# use verbose or not
-		if test "${VERBOSE}" = "true"; then
-			mkfs.ext4 -v -j -L writable "${DEVICE}2"
-			exitonerror $? "Error formatting writable ${DEVICE}2"
-		else
-		# no verbose
-			echo "formatting writable on ${DEVICE}2"
-			mkfs.ext4 -j -L writable "${DEVICE}2"
-			exitonerror $? "Error formatting writable ${DEVICE}2"
-		fi
-	fi
-
-	# copy the latest version of initialise-linux
-	# from /mnt/debhome/pool/myown/i/initialise-linux* to /mnt/writable/upper/root/
-	copyinitialise
-
-	# copy files from /root/cdrom -> /mnt/LINUXLIVE
-	copyfiles "/root/cdrom" "LINUXLIVE"
 }
 
 ##################################################################
@@ -375,33 +319,29 @@ mountcopypermissions() {
 	# since the wrong one may be mounted
 	findmnt /mnt/cdrom > /dev/null 2>&1
 	if test "$?" -eq 0; then
-		umount -v "/mnt/cdrom"
+		umount ${VERBOSE:+"-v"} "/mnt/cdrom"
 		exitonerror $? "Error umounting $1"
 	fi
 
 	# mount the cdrom
-	mount "$1" /mnt/cdrom -o ro
+	mount ${VERBOSE:+"-v"} "$1" /mnt/cdrom -o ro
 	exitonerror $? "Could not mount $1 on /mnt/cdrom" "/mnt/cdrom"
 
 	# if /root/cdrom exists
 	# delete it
-	test -d /root/cdrom && rm -rf /root/cdrom
+	test -d /root/cdrom && rm ${EXTRAVERBOSE:+"-v"} -rf /root/cdrom
+
+	# if /root/EFI exsts delete it
+	test -d /root/EFILIVE && rm ${EXTRAVERBOSE:+"-v"} -rf /root/EFILIVE
+
+	# make directory /root/EFI
+	mkdir ${VERBOSE:+"-v"} "/root/EFILIVE"
+
 
 	# copy cdrom files to root
 	echo "copying /mnt/cdrom -> /root"
-
-	if test "${VERBOSE}" = "true"; then
-		cp -dR -v /mnt/cdrom /root/
-
-		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
-	else
-		cp -dR /mnt/cdrom /root
-		exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
-	fi
-
-	umount "/mnt/cdrom"
-	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
-
+	cp -dR ${EXTRAVERBOSE:+"-v"} /mnt/cdrom /root/
+	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
 	# set file and directory permissions
 	find /root/cdrom -type f -exec chmod a+w {} \;
 	find /root/cdrom -type d -exec chmod 755 {} \;
@@ -421,8 +361,6 @@ usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
 	echo "-i install grub and copy cdrom files to LINUXLIVE"
 	echo "-I install grub only"
-	echo "-r reinstall linux, formats LINUXLIVE and writable";
-	echo "-R reinstall linux, does not format writable";
 	echo "-m copy MACRIUM files to MACRIUM partition";
 	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
@@ -430,7 +368,8 @@ usage() {
 	echo "-L size in GB of LINUXLIVE partition, default = ${LLIVESIZE}GB";
 	echo "-W size in GB of writable partition, default = ${WSIZE}GB";
 	echo "-T size in GB of MCTREC partition, default = ${MCTSIZE}GB";
-	echo "-v verbose copying"
+	echo "-v verbose for everything except file copy/move"
+	echo "-V verbose for everything"
 	exit 0;
 }
 
@@ -451,20 +390,20 @@ CPMACRIUM="false"
 CPMCTREC="false"
 INSTALLGRUB="false"
 INSTALLGRUBCOPY="false"
-VERBOSE="false"
-REINSTALLLINUX="false"
-REINSTALLLINUXFORMAT="false"
+# VERBOSE must not be set for absence of -v
+# if it is set to anything, -v will be used
+VERBOSE=
+# EXTRAVERBOSE is used to display verbose for copying of files as well"
+EXTRAVERBOSE=
 
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts iIrRc:pD:W:M:L:T:mtvh opt
+while getopts iU:Ic:pD:W:M:L:T:mtvVh opt
 do
 	case ${opt} in
 		I) INSTALLGRUB="true";;
 		i) INSTALLGRUBCOPY="true";;
-		R) REINSTALLLINUX="true";;
-		r) REINSTALLLINUXFORMAT="true";;
 		c) ISOIMAGE="${OPTARG}";;
 		p) PARTDISK="true";;
 		M) MASIZE="${OPTARG}"; PARTDISK="true";;
@@ -474,6 +413,7 @@ do
 		m) CPMACRIUM="true";;
 		t) CPMCTREC="true";;
 		v) VERBOSE="true";;
+		V) EXTRAVERBOSE="true"; VERBOSE="true";;
 		h) usage;;
 		\?) usage;;
 	esac
@@ -484,9 +424,8 @@ done
 
 # if -p or -D or -W or -M given , partition the disk
 if test "${PARTDISK}" = "true"; then
-	/usr/local/bin/partdisk.pl -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
+	/usr/local/bin/partdisk.pl ${VERBOSE:+"-v"} -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
 	exitonerror $? "partdisk.pl gave an error ... exiting"
-
 	# copy initialise-linux from local repository to /mnt/writable/upper/root/
 	copyinitialise
 fi
@@ -508,17 +447,6 @@ test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "MACRIUM"
 
 # for mctrec if -t given
 test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "MCTREC"
-
-# reinstall linux if -r given or -R given
-# -r reinstalls linux and formats writable
-# -R reinstalls linux only
-if test "${REINSTALLLINUXFORMAT}" = "true"; then
-	# reinstall and format writable
-	reinstall "format"
-elif test "${REINSTALLLINUX}" = "true"; then
-	# reinstall and no format
-	reinstall
-fi
 
 # install grub to the correct device
 # -i install and copies cdrom files

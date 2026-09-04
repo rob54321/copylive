@@ -5,7 +5,9 @@ use strict;
 use warnings;
 use Getopt::Std;
 
-our ($opt_h, $opt_L, $opt_T, $opt_W, $opt_M);
+our ($opt_v, $opt_h, $opt_L, $opt_T, $opt_W, $opt_M);
+# for verbose option
+my $opt = "";
 
 # help message
 sub usage {
@@ -13,6 +15,7 @@ sub usage {
 	print "-W (size in GB) default is 10GB persistence partition\n";
 	print "-M size of MACRIUM partition in GB default is 1GB fat32\n";
 	print "-T size of MCTREC partition in GB default is 8GB fat32\n";
+	print "-v for verbose";
 	print "-h display this usage\n";
 	exit 0;
 }
@@ -135,27 +138,27 @@ sub partitiondisk {
 
 		# format parition 1 LINUXLIVE
 		print "formatting partition " . $device . "1\n";
-		$rc = system("mkfs.vfat -v -n LINUXLIVE -i 11111111 " . $device . "1");
+		$rc = system("mkfs.vfat $opt -n LINUXLIVE -i 11111111 " . $device . "1");
 		die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
 
 		# format parition 2 writable
 		print "formatting partition " . $device . "2\n";
-		$rc = system("mkfs.ext4 -v -j -L writable " . $device . "2");
+		$rc = system("mkfs.ext4 $opt -j -L writable " . $device . "2");
 		die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
 
 		# format partition 3 MACRIUM
 		print "formatting partition " . $device . "3\n";
-		$rc = system( "mkfs.vfat -v -n MACRIUM -i AED6434E " . $device . "3");
+		$rc = system( "mkfs.vfat $opt -n MACRIUM -i AED6434E " . $device . "3");
 		die "aborting: error formatting " . $device . "3\n" unless $rc == 0;
 
 		# format partition 4 MCTREC
 		print "formatting partition " . $device . "4\n";
-		$rc = system("mkfs.vfat -v -n MCTREC -i 44444444 " . $device . "4");
+		$rc = system("mkfs.vfat $opt -n MCTREC -i 44444444 " . $device . "4");
 		die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
 
 		# format parition 5 ele
 		print "formatting partition " . $device . "5\n";
-		$rc = system("mkfs.ntfs -v -Q -L ele  " . $device . "5");
+		$rc = system("mkfs.ntfs $opt -Q -L ele  " . $device . "5");
 		die "aborting: error formatting " . $device . "5\n" unless $rc == 0;
 
 	} else {
@@ -172,16 +175,20 @@ sub partitiondisk {
 # -W is size of writable partition for persitence in GB default is 10GB
 # -M is size of  MACRIUM partition in GB default is 2GB
 # -T is size of MCRECT partition in GB default is 8GB
+# -v for verbose
 # set defaults in GB
 my $macriumsize = 2;
 my $linuxlivesize = 8;
 my $writablesize = 10;
 my $mctrecsize = 8;
 
-getopts('L:D:W:M:T:h');
+getopts('vL:D:W:M:T:h');
 
 # display help and exit if -h given
 usage () if $opt_h;
+
+# for verbose
+$opt = "-v" if $opt_v;
 
 # set linuxlive size
 $linuxlivesize = $opt_L if $opt_L;
