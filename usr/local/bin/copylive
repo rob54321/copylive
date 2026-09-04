@@ -164,7 +164,7 @@ installgrub () {
 	# install grub
 	# TESTING
 	echo "install-grub ${VERBOSE:+"-v"} on ${DEVICE}"
-#	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
+	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
 	exitonerror $? "Error installing grub"
 }
 
