@@ -336,9 +336,12 @@ mountcopypermissions() {
 	echo "copying /mnt/cdrom -> /root"
 	cp -dR ${EXTRAVERBOSE:+"-v"} /mnt/cdrom /root/
 	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
+	# umount /mnt/cdrom
+	umountlabel "cdrom"
+
 	# set file and directory permissions
-	find /root/cdrom -type f -exec chmod ${VERBOSE:+"-v"} a+w {} \;
-	find /root/cdrom -type d -exec chmod ${VERBOSE:+"-v"} 755 {} \;
+	find /root/cdrom -type f -exec chmod ${EXTRAVERBOSE:+"-v"} a+w {} \;
+	find /root/cdrom -type d -exec chmod ${EXTRAVERBOSE:+"-v"} 755 {} \;
 
 	# get distro name from /mnt/cdrom/.disk/info
 	DISTRONAME=`getdistroname`;
