@@ -173,8 +173,15 @@ installgrub () {
 	# install grub
 	# TESTING
 	echo "install-grub ${VERBOSE:+"-v"} on ${DEVICE}"
-	grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
-	exitonerror $? "Error installing grub"
+	
+	# only install grub on amd64
+	ARCH=`arch`
+	if test "${ARCH}" = "x86_64"; then
+		grub-install --uefi-secure-boot --no-floppy --removable --target=x86_64-efi "${DEVICE}"
+		exitonerror $? "Error installing grub"
+	else
+		echo "Simulating grub-install on arm64"
+	fi
 }
 
 
