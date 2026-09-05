@@ -162,6 +162,9 @@ installgrub () {
 		# copy cdrom files
 		copyfiles "/root/cdrom" "LINUXLIVE"
 
+		# copy initialise-linux from local repository to /mnt/writable/upper/root/
+		copyinitialise
+
 		# copy files
 		copyfiles "/root/EFILIVE" "EFILIVE"
 	fi
@@ -375,7 +378,7 @@ mountcopypermissions() {
 # usage function
 usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
-	echo "-i install grub and copy cdrom files to LINUXLIVE"
+	echo "-i install grub and copy cdrom files to LINUXLIVE and copy initialise-linux to /mnt/writable/upper/root/"
 	echo "-I install grub only"
 	echo "-U uuid of LINUXLIVE partition, default=${LINUXLIVEUUID}";
 	echo "-m copy MACRIUM files to MACRIUM partition";
@@ -450,8 +453,6 @@ done
 if test "${PARTDISK}" = "true"; then
 	/usr/local/bin/partdisk.pl ${VERBOSE:+"-v"} -E "${EFISIZE}" -U "${LINUXLIVEUUID}" -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
 	exitonerror $? "partdisk.pl gave an error ... exiting"
-	# copy initialise-linux from local repository to /mnt/writable/upper/root/
-	copyinitialise
 fi
 
 # if -c given, create /root/cdrom else /root/cdrom must already exist
