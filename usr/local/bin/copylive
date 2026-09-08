@@ -392,7 +392,6 @@ usage() {
 	echo "	vfat default ${LINUXLIVEVOLID}"
 	echo "-m copy MACRIUM files to MACRIUM partition";
 	echo "-t copy MCTREC files to MCTREC partition";
-	echo "-p partition disk with default parameters";
 	echo "-e partition disk LINUXLIVE as ext4, separate from EFI partition";
 	echo "-f partition disk LINUXLIVEV as fat32. combined with EFI parttion";
 	echo "-E size in GB of EFILIVE partition, default = ${EFISIZE}GB";
@@ -442,7 +441,7 @@ LINUXLIVEVOLID="11111111"
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts efiU:Ic:pD:W:M:L:T:mtvVh opt
+while getopts efiU:Ic:D:W:M:L:T:mtvVh opt
 do
 	case ${opt} in
 		f) VFATOPTION="true"; PARTDISK="true";;
@@ -452,7 +451,6 @@ do
 		E) EFISIZE="${OPTARG}";;
 		i) INSTALLGRUBCOPY="true";;
 		c) ISOIMAGE="${OPTARG}";;
-		p) PARTDISK="true";;
 		M) MASIZE="${OPTARG}"; PARTDISK="true";;
 		L) LLIVESIZE="${OPTARG}"; PARTDISK="true";;
 		W) WSIZE="${OPTARG}"; PARTDISK="true";;
@@ -487,6 +485,9 @@ if test "${PARTDISK}" = "true"; then
 
 		/usr/local/bin/partdisk.pl ${VERBOSE:+"-v"} -f -U "${UUID}" -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
 		exitonerror $? "partdisk.pl gave an error ... exiting"
+	else
+		# neither -e nor -f was given
+		echo "Neither -e nor -f was given: cannot partition the disk"
 	fi
 fi
 
