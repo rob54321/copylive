@@ -387,10 +387,14 @@ usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
 	echo "-i install grub and copy cdrom files to LINUXLIVE and copy initialise-linux to /mnt/writable/upper/root/"
 	echo "-I install grub only"
-	echo "-U uuid of LINUXLIVE partition, default=${LINUXLIVEUUID}";
+	echo "-U uuid of LINUXLIVE or LINUXLIVEV partition"
+	echo "	ext4 default ${LINUXLIVEUUID}"
+	echo "	vfat default ${LINUXLIVEVOLID}"
 	echo "-m copy MACRIUM files to MACRIUM partition";
 	echo "-t copy MCTREC files to MCTREC partition";
 	echo "-p partition disk with default parameters";
+	echo "-e partition disk LINUXLIVE as ext4, separate from EFI partition";
+	echo "-f partition disk LINUXLIVEV as fat32. combined with EFI parttion";
 	echo "-E size in GB of EFILIVE partition, default = ${EFISIZE}GB";
 	echo "-M size in GB of MACRIUM parition, default = ${MASIZE}GB";
 	echo "-L size in GB of LINUXLIVE partition, default = ${LLIVESIZE}GB";
@@ -419,6 +423,10 @@ CPMACRIUM="false"
 CPMCTREC="false"
 INSTALLGRUB="false"
 INSTALLGRUBCOPY="false"
+VFATOPTION="false"
+EXT4OPTION="false"
+UUID="0"
+
 # VERBOSE must not be set for absence of -v
 # if it is set to anything, -v will be used
 VERBOSE=
@@ -428,14 +436,19 @@ EXTRAVERBOSE=
 # uuid of LINUXLIVE parition p2.
 LINUXLIVEUUID="12345678-1234-1234-1234-123456789012"
 
+#volume id for LINUXLIVEV partition p1
+LINUXLIVEVOLID="11111111"
+
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts iU:Ic:pD:W:M:L:T:mtvVh opt
+while getopts efiU:Ic:pD:W:M:L:T:mtvVh opt
 do
 	case ${opt} in
+		f) VFATOPTION="true"; PARTDISK="true";;
+		e) EXT4OPTION="true"; PARTDISK="true";;
 		I) INSTALLGRUB="true";;
-		U) LINUXLIVEUUID="${OPTARG}"; PARTDISK="true";;
+		U) UUID="${OPTARG}"; PARTDISK="true";;
 		E) EFISIZE="${OPTARG}";;
 		i) INSTALLGRUBCOPY="true";;
 		c) ISOIMAGE="${OPTARG}";;
@@ -456,10 +469,25 @@ done
 # testing
 # echo "${ISOIMAGE}: ${PARTDISK}, ${LLIVESIZE}, ${WSIZE} , ${MCTSIZE}";
 
-# if -p or -D or -W or -M given , partition the disk
+# if -p or -D or -W or -M or -e or -f given , partition the disk
+# for partitioning one of -e or -f must be given.
 if test "${PARTDISK}" = "true"; then
-	/usr/local/bin/partdisk.pl ${VERBOSE:+"-v"} -E "${EFISIZE}" -U "${LINUXLIVEUUID}" -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
-	exitonerror $? "partdisk.pl gave an error ... exiting"
+	# check if -e given
+	if test "${EXT4OPTION}" = "true"; then
+		# partition with ext4 option
+		# set the uuid to default if it was not given
+		test "${UUID}" = "0" && UUID="${LINUXLIVEUUID}"
+
+		/usr/local/bin/partdisk.pl ${VERBOSE:+"-v"} -e -E "${EFISIZE}" -U "${UUID}" -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
+		exitonerror $? "partdisk.pl gave an error ... exiting"
+	elif test "${VFATOPTION}" = "true"; then
+		# parition with vfat option
+		# set the uuid to default if it was not given
+		test "${UUID}" = "0" && UUID="${LINUXLIVEVOLID}"
+
+		/usr/local/bin/partdisk.pl ${VERBOSE:+"-v"} -f -U "${UUID}" -L "${LLIVESIZE}" -W "${WSIZE}" -M "${MASIZE}" -T "${MCTSIZE}"
+		exitonerror $? "partdisk.pl gave an error ... exiting"
+	fi
 fi
 
 # if -c given, create /root/cdrom else /root/cdrom must already exist
