@@ -186,14 +186,22 @@ sub partitiondisk {
 			# format parition 2 LINUXLIVE
 			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 			print "formatting partition LINUXLIVE " . $device . "2\n";
-			$rc = system("mkfs.ext4 $formatoptions -j -L LINUXLIVE -U $linuxliveuuid " . $device . "2");
+			# only for ext4 formatting : no verbose -q; verbose -v
+			my $ext4options;
+			if ($formatoptions eq "") {
+				$ext4options = "-q";
+			} else {
+				# -v was given
+				$ext4options = "-v";
+			}
+			$rc = system("mkfs.ext4 $ext4options -j -L LINUXLIVE -U $linuxliveuuid " . $device . "2");
 			die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
 			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 			# format parition 3 writable
 			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 			print "formatting partition writable " . $device . "3\n";
-			$rc = system("mkfs.ext4 $formatoptions -j -L writable " . $device . "3");
+			$rc = system("mkfs.ext4 $ext4options -j -L writable " . $device . "3");
 			die "aborting: error formatting " . $device . "3\n" unless $rc == 0;
 			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
@@ -283,7 +291,16 @@ sub partitiondisk {
 
 			# format parition 2 writable
 			print "formatting partition " . $device . "2\n";
-			$rc = system("mkfs.ext4 $formatoptions -j -L writable " . $device . "2");
+			# for ext4 only no verbose = -q; verbose = -v
+			my $ext4options;
+			if ($formatoptions eq "") {
+				$ext4options = "-q";
+			} else {
+				# -v was given
+				$ext4options = "-v";
+			}
+
+			$rc = system("mkfs.ext4 $ext4options -j -L writable " . $device . "2");
 			die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
 
 			# format partition 3 MACRIUM
@@ -330,31 +347,21 @@ usage () if $opt_h;
 
 # set defaults
 # formating options for vfat and ext4
-my $formatoptions;
+my $formatoptions = "";
 my $linuxliveuuid;
+
+$formatoptions = "-v" if $opt_v;
 
 if ($opt_e) {
 	# values for ext4 option
 	$linuxliveuuid = $linuxliveuuiddefault;
 	$efisize = $opt_E if $opt_E;
 
-	# format options for ext4
-	if ($opt_v) {
-		$formatoptions = "-v";
-	} else {
-		$formatoptions = "-q";
-	}
 } elsif ($opt_f) {
 	# values for vfat option
 	$linuxliveuuid = $linuxlivevolumeiddefault;
 	$efisize = "";
 	
-	#format options for vfat
-	if ($opt_v) {
-		$formatoptions = "-v";
-	} else {
-		$formatoptions = "";
-	}
 } else {
 	# -e and -f were not given
 	die "One of -e or -f must be given\n";
