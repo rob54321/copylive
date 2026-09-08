@@ -194,14 +194,14 @@ sub partitiondisk {
 				# -v was given
 				$ext4options = "-v";
 			}
-			$rc = system("mkfs.ext4 $ext4options -j -L LINUXLIVE -U $linuxliveuuid " . $device . "2");
+			$rc = system("mkfs.ext4 $ext4options -F -j -L LINUXLIVE -U $linuxliveuuid " . $device . "2");
 			die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
 			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 			# format parition 3 writable
 			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 			print "formatting partition writable " . $device . "3\n";
-			$rc = system("mkfs.ext4 $ext4options -j -L writable " . $device . "3");
+			$rc = system("mkfs.ext4 $ext4options -F -j -L writable " . $device . "3");
 			die "aborting: error formatting " . $device . "3\n" unless $rc == 0;
 			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
@@ -302,7 +302,7 @@ sub partitiondisk {
 			}
 
 			print "formatting partition " . $device . "2\n";
-			$rc = system("mkfs.ext4 $ext4options -j -L writable " . $device . "2");
+			$rc = system("mkfs.ext4 $ext4options -j -F -L writable " . $device . "2");
 			die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
 			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
