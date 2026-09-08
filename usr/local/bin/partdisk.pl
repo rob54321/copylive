@@ -395,7 +395,5 @@ $mctrecsize = $opt_T if $opt_T;
 # set size of macrium partition
 $macriumsize = $opt_M if $opt_M;
 
-print "format options: $formatoptions linuxuuid: $linuxliveuuid efi size: $efisize\n";
-
 # partition disk, efsize set for ext4 and set to "" for vfat case
 partitiondisk($linuxliveuuid, $efisize, $linuxlivesize, $writablesize, $macriumsize, $mctrecsize, $formatoptions);
