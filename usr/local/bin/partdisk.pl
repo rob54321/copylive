@@ -285,13 +285,14 @@ sub partitiondisk {
 			sleep 2;
 
 			# format parition 1 LINUXLIVEv
+			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 			print "formatting partition " . $device . "1\n";
-			$rc = system("mkfs.vfat $formatoptions -n LINUXLIVEv -i $linuxliveuuid " . $device . "1");
+			$rc = system("mkfs.vfat $formatoptions -n LINUXLIVEV -i $linuxliveuuid " . $device . "1");
 			die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
 
 			# format parition 2 writable
-			print "formatting partition " . $device . "2\n";
 			# for ext4 only no verbose = -q; verbose = -v
+			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 			my $ext4options;
 			if ($formatoptions eq "") {
 				$ext4options = "-q";
@@ -300,23 +301,31 @@ sub partitiondisk {
 				$ext4options = "-v";
 			}
 
+			print "formatting partition " . $device . "2\n";
 			$rc = system("mkfs.ext4 $ext4options -j -L writable " . $device . "2");
 			die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
+			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 			# format partition 3 MACRIUM
+			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 			print "formatting partition " . $device . "3\n";
 			$rc = system( "mkfs.vfat $formatoptions -n MACRIUM -i AED6434E " . $device . "3");
 			die "aborting: error formatting " . $device . "3\n" unless $rc == 0;
+			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 			# format partition 4 MCTREC
+			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 			print "formatting partition " . $device . "4\n";
 			$rc = system("mkfs.vfat $formatoptions -n MCTREC -i 44444444 " . $device . "4");
 			die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
+			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 			# format parition 5 ele
+			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 			print "formatting partition " . $device . "5\n";
-			$rc = system("mkfs.ntfs $formatoptions -Q -L ele  " . $device . "5");
+			$rc = system("mkfs.ntfs $formatoptions -Q -L data  " . $device . "5");
 			die "aborting: error formatting " . $device . "5\n" unless $rc == 0;
+			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 
 		} else {
 			print "$device was not partitioned\n";
