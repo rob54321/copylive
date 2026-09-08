@@ -237,7 +237,7 @@ sub partitiondisk {
 		if ($answer =~ /^yes$/i) {
 			print "partitioning $device\n";
 
-			# partition 1: LINUXLIVE parition fat32
+			# partition 1: LINUXLIVEv parition fat32
 			# partition 2: writable partition ext4 for persistence
 			# partition 3: MACRIUM partition fat32 size is passed as a parameter to this sub
 			# partition 4: MCTREC partition media tool creation tool
@@ -276,9 +276,9 @@ sub partitiondisk {
 			# if partition size is bigger than 12GB
 			sleep 2;
 
-			# format parition 1 LINUXLIVE
+			# format parition 1 LINUXLIVEv
 			print "formatting partition " . $device . "1\n";
-			$rc = system("mkfs.vfat $formatoptions -n LINUXLIVE -i 11111111 " . $device . "1");
+			$rc = system("mkfs.vfat $formatoptions -n LINUXLIVEv -i $linuxliveuuid " . $device . "1");
 			die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
 
 			# format parition 2 writable
