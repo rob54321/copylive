@@ -2,7 +2,7 @@
 # this script partitions a disk for use in a linux live system.
 # There are 2 options:
 # 1: p1 EFILIVE vfat; p2 LINUXLIVE ext4; p3 writable ext4; p4 MACRIUM vfat; p5 MCTREC vfat; p6 data ntfs
-# 2: p1 LINUXLIVEv vfat; p2 writable ext4; p3 MACRIUM vfat; p4 MCTREC vfat; p5 data ntfs
+# 2: p1 LINUXLIVE vfat; p2 writable ext4; p3 MACRIUM vfat; p4 MCTREC vfat; p5 data ntfs
 # switch -e choses option 1
 # swtich -f choses options2
 # there is no default. -e or -f must be given.
@@ -31,7 +31,7 @@ my $mctrecsize = 8;
 
 # help message
 sub usage {
-	print "-f LINUXLIVEv is vfat and contains efi/boot\n";
+	print "-f LINUXLIVE is vfat and contains efi/boot\n";
 	print "-e LINUXLIVE is ext4 and efi is a separate partition\n";
 	print "-E size of EFI partition in GB default is $efisize " . "GB fat32\n";
 	print "-L size of LINUXLIVE partition in GB default is $linuxlivesize " . "GB ext4\n";
@@ -124,8 +124,8 @@ sub partitiondisk {
 		# partitioning for ext4 option
 		my $datasize = $devicesize - ($efisize + $linuxlivesize + $writablesize + $mctrecsize);
 		
-		print "\n\nThe disk will be partitioned as follows:\n";
-		print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\np1: EFI parition = $efisize GB\np2: LINUXLIVE partition = $linuxlivesize GB uuid = $linuxliveuuid\np3: writable partition = $writablesize GB\np4: MACRIUM partion = $macriumsize GB\np5: MCTREC partition = $mctrecsize GB\np6: ele partition = $datasize GB\n";
+		print "\n\nThe disk will be partitioned as follows:\n\n";
+		print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\np1: EFI fat32 parition = $efisize GB\np2: LINUXLIVE ext4 partition = $linuxlivesize GB uuid = $linuxliveuuid\np3: writable ext4 partition = $writablesize GB\np4: MACRIUM fat32 partion = $macriumsize GB\np5: MCTREC fat32 partition = $mctrecsize GB\np6: data ntfs partition = $datasize GB\n";
 		print "\n\nAll data on $device will be deleted: is this correct (yes|no)?\n";
 		my $answer = <STDIN>;
 		chomp($answer);
@@ -166,6 +166,7 @@ sub partitiondisk {
 			$p6start .= "GB";
 			
 			# delete all partitions and make new ones
+			# p1 EFILIVE vfat ; p2 LINUXLIVE ext4; p3 writable ext4; p4 MACRIUM vfat; p5 MCTREC vfat; p6 data ntfs
 
 			$rc = system("parted -s --align optimal $device mktable gpt mkpart p1 fat32 $p1start $p1end mkpart p2 ext4 $p2start $p2end mkpart p3 ext4 $p3start $p3end mkpart p4 fat32  $p4start $p4end mkpart p5 fat32 $p5start $p5end mkpart p6 ntfs $p6start $p6end set 1 boot on");
 			die "aborting: error partitioning $device\n" unless $rc == 0;
@@ -236,8 +237,8 @@ sub partitiondisk {
 		# size = disk size  - (linuxlivesize + writablesize + mctrecsize)
 		my $datasize = $devicesize - ($linuxlivesize + $writablesize + $mctrecsize);
 
-		print "\n\nThe disk will be partitioned as follows:\n";
-		print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\np1: LINUXLIVE partition = $linuxlivesize GB\np2: writable partition = $writablesize GB\np3: MACRIUM partion = $macriumsize GB\np4: MCTREC partition = $mctrecsize GB\np5: ele partition = $datasize GB\n";
+		print "\n\nThe disk will be partitioned as follows:\n\n";
+		print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\np1: LINUXLIVE fat32 partition = $linuxlivesize GB\np2: writable ext4 partition = $writablesize GB\np3: MACRIUM fat32 partion = $macriumsize GB\np4: MCTREC fat32 partition = $mctrecsize GB\np5: data ntfs partition = $datasize GB\n";
 		print "\n\nAll data on $device will be deleted: is this correct (yes|no)?\n";
 		my $answer = <STDIN>;
 		chomp($answer);
@@ -245,7 +246,7 @@ sub partitiondisk {
 		if ($answer =~ /^yes$/i) {
 			print "partitioning $device\n";
 
-			# partition 1: LINUXLIVEv parition fat32
+			# partition 1: LINUXLIVE parition fat32
 			# partition 2: writable partition ext4 for persistence
 			# partition 3: MACRIUM partition fat32 size is passed as a parameter to this sub
 			# partition 4: MCTREC partition media tool creation tool
@@ -284,10 +285,10 @@ sub partitiondisk {
 			# if partition size is bigger than 12GB
 			sleep 2;
 
-			# format parition 1 LINUXLIVEv
+			# format parition 1 LINUXLIVE
 			print "\n+++++++++++++++++++++++++++++++++++++++++++++++\n";
 			print "formatting partition " . $device . "1\n";
-			$rc = system("mkfs.vfat $formatoptions -n LINUXLIVEV -i $linuxliveuuid " . $device . "1");
+			$rc = system("mkfs.vfat $formatoptions -n LINUXLIVE -i $linuxliveuuid " . $device . "1");
 			die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
 
 			# format parition 2 writable
