@@ -152,17 +152,18 @@ copyinitialise() {
 # function to determine if first partition is EFILIVE or LINUXLIVE
 # and determine uuid for the copy
 # parameters passed: device . 1 ie /dev/sda1 for example
+# parameter returned : LINUXLIVE 1111-1111 for ex.
 #########################################################################
-partition1name() {
+partition1nameuuid() {
 	# much  easier in perl
 	# is partition 1 EFILIVE or LINUXLIVE
-	PARTNAME=$(perl -e 'use strict; use warnings;
+	PARTNAMEUUID=$(perl -e 'use strict; use warnings;
 					  my $part = shift;
-	                  my @list = `lsblk $part -o LABEL`;
+	                  my @list = `lsblk $part -o LABEL,UUID`;
 	                  # 1st line is LABEL title
 	                  # 2nd line is actual label
 	                  print "$list[1]";' "$1")
-#	echo "${PARTNAME}" 
+#	echo "${PARTNAMEUUID}" 
 }
 	                  
 
@@ -193,11 +194,20 @@ installgrub () {
 		# determine if p1 is EFILIVE or LINUXLIVE
 		# and get the uuid
 		# returned string is LINUXLIVE 1111-1111
-		partition1name "${DEVICE}1"
-		echo "${VERBOSE:+"partition 1 name : ${PARTNAME}"}"
+		partition1nameuuid "${DEVICE}1"
 		echo "${VERBOSE:+"device = ${DEVICE}"}"
-		exit
+		echo "${VERBOSE:+"name uuid: ${PARTNAMEUUID}"}"
 
+		# PARTNAMEUUID is of form "name uuid"
+		# get name part
+		PARTNAME=$(perl -e 'use strict; use warnings;
+							my $name = shift;
+							$name =~ s/ .*$//;
+							chomp($name);
+							print "$name";' "${PARTNAMEUUID}")
+
+		echo "${VERBOSE:+"partition name: ${PARTNAME}"}"
+exit
 		if test "${PARTNAME}" = "LINUXLIVE"; then
 			# copy all files
 			copyfiles "/root/cdrom" "LINUXLIVE"
@@ -205,6 +215,7 @@ installgrub () {
 			# copy grub.cfg to /root/cdrom/boot/grub.cfg
 			# set the uuid of the boot partition on the live system by reading it from the partition
 			# uuid is different for vfat and ext4 LINUXLIVE partition.
+			# determine the uuid of the partition
 			copygrub "${DISTRONAME}" "${UUID}"
 
 		elif test "$PARTNAME}" = "EFILIVE"; then
