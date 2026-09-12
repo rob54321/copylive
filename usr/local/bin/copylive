@@ -158,11 +158,11 @@ partition1name() {
 	# is partition 1 EFILIVE or LINUXLIVE
 	PARTNAME=$(perl -e 'use strict; use warnings;
 					  my $part = shift;
-	                  my @list = `lsblk $part -o LABEL,UUID`;
+	                  my @list = `lsblk $part -o LABEL`;
 	                  # 1st line is LABEL title
 	                  # 2nd line is actual label
 	                  print "$list[1]";' "$1")
-#	echo "${PARTNAME}"
+#	echo "${PARTNAME}" 
 }
 	                  
 
@@ -183,18 +183,24 @@ installgrub () {
 		# copy initialise-linux from local repository to /mnt/writable/upper/root/
 		copyinitialise
 
+		# get distro name from /mnt/cdrom/.disk/info
+		# to be used by copygrub
+		DISTRONAME=`getdistroname`;
+
+		# echo distro name
+		echo "${VERBOSE:+"distro name: ${DISTRONAME}"}"
+
 		# determine if p1 is EFILIVE or LINUXLIVE
+		# and get the uuid
+		# returned string is LINUXLIVE 1111-1111
 		partition1name "${DEVICE}1"
-		echo "partition name is : ${PARTNAME}"
-		if test "${PARNAME}" = "LINUXLIVE"; then
+		echo "${VERBOSE:+"partition 1 name : ${PARTNAME}"}"
+		echo "${VERBOSE:+"device = ${DEVICE}"}"
+		exit
+
+		if test "${PARTNAME}" = "LINUXLIVE"; then
 			# copy all files
 			copyfiles "/root/cdrom" "LINUXLIVE"
-
-			# get distro name from /mnt/cdrom/.disk/info
-			DISTRONAME=`getdistroname`;
-
-			# echo distro name
-			echo "distro name: ${DISTRONAME}"
 
 			# copy grub.cfg to /root/cdrom/boot/grub.cfg
 			# set the uuid of the boot partition on the live system by reading it from the partition
