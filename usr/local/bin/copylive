@@ -236,6 +236,10 @@ installgrub () {
 		# linuxlivedata returns part no, part name, uuid
 		# or "error" if the partition was not found
 		# the return is in RESULT
+		# exit on and error from linuxlivedata
+		test "${RESULT}" = "error" && exitonerror 1 "Error from linuxlivedata(): LINUXLIVE not found";
+		
+		# for verbose
 		echo "${VERBOSE:+"device = ${DEVICE}"}"
 		echo "${VERBOSE:+"part no; part name; uuid: ${RESULT}"}"
 		# separate partition no, partition name and uuid
@@ -244,19 +248,22 @@ installgrub () {
 		UUID=`echo ${RESULT} | cut -d " " -f3`
 		echo "${VERBOSE:+"part no ${PARTNO}; part name ${PARTNAME}; uuid ${UUID}"}"
 
-exit
-		if test "${PARTNAME}" = "LINUXLIVE"; then
-			# copy all files
+		# copy grub.cfg to /root/cdrom/boot/grub.cfg
+		# set the uuid of the boot partition on the live system by reading it from the partition
+		# uuid is different for vfat and ext4 LINUXLIVE partition.
+		# determine the uuid of the partition
+		copygrub "${DISTRONAME}" "${UUID}"
+
+		# if LINUXLIVE is partition 1 it is vfat
+		# if LINUXLIVE is partition 2 it is ext4
+		if test "${PARTNO}" -eq 1; then
+			# LINUXLIVE is vfat
+			# copy all cdrom files into LINUXLIVE
 			copyfiles "/root/cdrom" "LINUXLIVE"
 
-			# copy grub.cfg to /root/cdrom/boot/grub.cfg
-			# set the uuid of the boot partition on the live system by reading it from the partition
-			# uuid is different for vfat and ext4 LINUXLIVE partition.
-			# determine the uuid of the partition
-			copygrub "${DISTRONAME}" "${UUID}"
-
-		elif test "$PARTNAME}" = "EFILIVE"; then
-			#cdrom/EFI and cdrom/boot must be moved to /mnt/EFILIVE
+		elif test "${PARTNO}" -eq 2; then
+			# LINUXLIVE is ext4
+			#cdrom/EFI and cdrom/boot must be copied  to /mnt/EFILIVE
 			umountlabel "EFILIVE"
 			mount ${VERBOSE:+"-v"} -L EFILIVE /mnt/EFILIVE
 			exitonerror $? "Error could not mount /mnt/EFILIVE" "/mnt/EFILIVE"
@@ -265,16 +272,17 @@ exit
 			find "/root/EFILIVE" -type l -exec rm ${VERBOSE:+"-v"} {} \;
 
 			# mv EFI and boot from cdrom in root
-			mv ${VERBOSE:+"-v"} /root/cdrom/EFI /mnt/EFILIVE
-			exitonerror $? "Error moving EFI to /mnt/EFILIVE"
-			mv ${VERBOSE:+"-V"} /root/cdrom/boot /mnt/EFILIVE
-			exitonerror $? "Error moving boot to /mnt/EFILIEVE"
+			cp -a ${VERBOSE:+"-v"} /root/cdrom/EFI /mnt/EFILIVE
+			exitonerror $? "Error copying EFI to /mnt/EFILIVE" "/mnt/EFILIVE"
+			cp -a  ${VERBOSE:+"-v"} /root/cdrom/boot /mnt/EFILIVE
+			exitonerror $? "Error copying boot to /mnt/EFILIVE" "/mnt/EFILIVE"
 			
 			#umount EFILIVE
 			umountlabel "EFILIVE"
 			
-			# copy the rest of the /root/cdrom
-			copyfiles "/root/cdrom" "linuxlive"
+			# copy cdrom files excluding cdrom/EFI and cdrom/boot  to LINUXLIVE.
+			# EFI and boot reside on EFILIVE
+			copyfiles "/root/cdrom" "LINUXLIVE"
 		fi
 	fi
 
