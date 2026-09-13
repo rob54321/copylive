@@ -149,23 +149,61 @@ copyinitialise() {
 }
 
 #########################################################################
-# function to determine if first partition is EFILIVE or LINUXLIVE
-# and determine uuid for the copy
-# parameters passed: device . 1 ie /dev/sda1 for example
-# parameter returned : LINUXLIVE 1111-1111 for ex.
+# function to find LINUXLIVE partition, 1 or 2 and return
+# the partition no and uuid of the partition
+# the uuid for ext4 must have the dashes
+# the uuid for vfat must not have any dashes
+# if LINUXLIVE is partition 1 , vfat then efi is in LINUXLIVE
+# if LINUXLIVE is partition 2 , ext4 then efi is on partition 1
+# parameters passed: device ie /dev/sda for example
+# parameter returned : partition number 1 or 2; uuid of partition
 #########################################################################
-partition1nameuuid() {
+linuxlivedata() {
 	# much  easier in perl
 	# is partition 1 EFILIVE or LINUXLIVE
-	PARTNAMEUUID=$(perl -e 'use strict; use warnings;
-					  my $part = shift;
-	                  my @list = `lsblk $part -o LABEL,UUID`;
-	                  # 1st line is LABEL title
-	                  # 2nd line is actual label
-	                  print "$list[1]";' "$1")
-#	echo "${PARTNAMEUUID}" 
+	RESULT=$(perl -e 'use strict; use warnings;
+					  my $device = shift;
+					  my $partno;
+					  my $partname;
+					  my $uuid;
+					  # flag for LINUXLIVE partition found
+					  my $found = "false";
+
+	                  my @list = `lsblk $device -n -o PARTN,LABEL,UUID`;
+	                  # output format is:
+	                  # part_no part_name fs-uuid
+	                  chomp(@list);
+	                  # search for LINUXLIVE in list
+	                  for(my $i=1; $i<scalar(@list); $i++) {
+						  # find partition name in output
+						  # output = part_no  part_name     uuid
+						  $list[$i] =~ /(\d+)\s+(\w+)\s+([a-zA-Z0-9-]+)/;
+						  $partno = $1;
+						  $partname = $2;
+						  $uuid = $3;
+						  if ($2 eq "LINUXLIVE") {
+							  # found LINUXLIVE indicate found and leave loop
+							  $found = "true";
+							  last;
+						  }
+					  }
+					  # if LINUXLIVE found return part-no,part-name,uuid
+					  # else return "error"
+					  if ($found eq "true") {
+						  # if LINUXLIVE is partition 1 the uuid is of form 1111-1111
+						  # the dash must be removed. If it is partition 2 no change to uuid
+						  if ($partno == 1) {
+							  # remove the dash in the middle
+							  $uuid =~ s/-//g;
+						  }
+						  print "$partno $partname $uuid";
+					  } else {
+						  print "error";
+					  }
+	                  ' "$1")
+#	echo "${RESULT}"
+
 }
-	                  
 
 #########################################################################
 # function to install grub
@@ -194,19 +232,18 @@ installgrub () {
 		# determine if p1 is EFILIVE or LINUXLIVE
 		# and get the uuid
 		# returned string is LINUXLIVE 1111-1111
-		partition1nameuuid "${DEVICE}1"
+		linuxlivedata "${DEVICE}"
+		# linuxlivedata returns part no, part name, uuid
+		# or "error" if the partition was not found
+		# the return is in RESULT
 		echo "${VERBOSE:+"device = ${DEVICE}"}"
-		echo "${VERBOSE:+"name uuid: ${PARTNAMEUUID}"}"
+		echo "${VERBOSE:+"part no; part name; uuid: ${RESULT}"}"
+		# separate partition no, partition name and uuid
+		PARTNO=`echo ${RESULT} | cut -d " " -f1`
+		PARTNAME=`echo ${RESULT} | cut -d " " -f2`
+		UUID=`echo ${RESULT} | cut -d " " -f3`
+		echo "${VERBOSE:+"part no ${PARTNO}; part name ${PARTNAME}; uuid ${UUID}"}"
 
-		# PARTNAMEUUID is of form "name uuid"
-		# get name part
-		PARTNAME=$(perl -e 'use strict; use warnings;
-							my $name = shift;
-							$name =~ s/ .*$//;
-							chomp($name);
-							print "$name";' "${PARTNAMEUUID}")
-
-		echo "${VERBOSE:+"partition name: ${PARTNAME}"}"
 exit
 		if test "${PARTNAME}" = "LINUXLIVE"; then
 			# copy all files
