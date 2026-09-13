@@ -74,6 +74,29 @@ getdevice () {
 }
 
 ##########################################################################################
+# function to get the partition number from the file system LABEL
+# parameters passed: DEVICE, LABEL
+# set PARTN
+##########################################################################################
+getpnofromlabel() {
+	PARTN=$(perl -e 'use strict; use warnings;
+					my $device = shift;
+					my $label = shift;
+					my @list = `lsblk $device -o LABEL,PARTN -n`;
+					chomp(@list);
+					# search for the label
+					for(my $i=1; $i<scalar(@list); $i++) {
+						# get label and partition number from element
+						$list[$i] =~ /(\w+)\s+(\d+)/;
+						# check if label found
+						if ($label eq $1) {
+							# return partition no
+							print "$2";
+							
+						}
+					}' "$1" "$2" )
+}
+##########################################################################################
 # function to umount LABEL = $1 on /mnt/LABEL
 # checks for multiple mounts on multiple mountpoints first.
 # unmounts all erroneous mounts
@@ -88,24 +111,23 @@ umountlabel () {
 	# set the partition number to be un mounted
 
 	# the partitions are numbered as follows:
-	# p 1 EFILIVE
+	# p 1 EFILIVE / LINUXLIVE
 	# p 2 LINUXLIVE
 	# p 3 writable
 	# p 4 MACRIUM
 	# p 5 MCTREC
 	# p 6 ele
 	# all are on the same device
-	case $1 in
-		EFILIVE)   p=1;;
-		LINUXLIVE) p=2;;
-		writable)  p=3;;
-		MACRIUM)   p=4;;
-		MCTREC)    p=5;;
-		ele)       p=6;;
-		*)         exitonerror 1 "Unknown option for umountlabel(): $1";;
-	esac
-	PARTITION="${DEVICE}${p}"
 
+	# get partition number from the device and LABEL
+	getpnofromlabel "${DEVICE}" "$1"
+	# check for return of error
+	echo "${VERBOSE:+"umount device = ${DEVICE}: part no = ${PARTN}"}"
+	test "${PARTN}" = "error" && exitonerror 1 "Error unmounting ${DEVICE} from /mnt/$1"
+
+	echo "${VERBOSE:+"un mounted ${DEVICE}${PARTN} from /mnt/$1"}" 
+	PARTITION="${DEVICE}${PARTN}"
+exit
 	# get a list of mount points for the partition
 	# unmount all of them,
 	# the bash parameters are partition_no and true/null for verbose/quiet
@@ -220,7 +242,7 @@ installgrub () {
 	# or                p1 EFILIVE ; p2 LINUXLIVE ...
 	if test "$1" = "copy"; then
 		# copy initialise-linux from local repository to /mnt/writable/upper/root/
-		copyinitialise
+#		copyinitialise
 
 		# get distro name from /mnt/cdrom/.disk/info
 		# to be used by copygrub
@@ -240,26 +262,31 @@ installgrub () {
 		test "${RESULT}" = "error" && exitonerror 1 "Error from linuxlivedata(): LINUXLIVE not found";
 		
 		# for verbose
-		echo "${VERBOSE:+"device = ${DEVICE}"}"
-		echo "${VERBOSE:+"part no; part name; uuid: ${RESULT}"}"
+		echo "${VERBOSE:+"linuxlivedata: device = ${DEVICE}"}"
+		echo "${VERBOSE:+"linuxlivedata: part no; part name; uuid: ${RESULT}"}"
 		# separate partition no, partition name and uuid
 		PARTNO=`echo ${RESULT} | cut -d " " -f1`
 		PARTNAME=`echo ${RESULT} | cut -d " " -f2`
 		UUID=`echo ${RESULT} | cut -d " " -f3`
 		echo "${VERBOSE:+"part no ${PARTNO}; part name ${PARTNAME}; uuid ${UUID}"}"
 
-		# copy grub.cfg to /root/cdrom/boot/grub.cfg
-		# set the uuid of the boot partition on the live system by reading it from the partition
-		# uuid is different for vfat and ext4 LINUXLIVE partition.
-		# determine the uuid of the partition
-		copygrub "${DISTRONAME}" "${UUID}"
-
 		# if LINUXLIVE is partition 1 it is vfat
 		# if LINUXLIVE is partition 2 it is ext4
 		if test "${PARTNO}" -eq 1; then
 			# LINUXLIVE is vfat
+			# links cannot be copied to a fat32 filesystem
+
+			# delete all links
+			find "/root/cdrom" -type l -exec rm ${VERBOSE:+"-v"} {} \;
+
 			# copy all cdrom files into LINUXLIVE
 			copyfiles "/root/cdrom" "LINUXLIVE"
+
+			# copy grub.cfg to /root/cdrom/boot/grub.cfg
+			# set the uuid of the boot partition on the live system by reading it from the partition
+			# uuid is different for vfat and ext4 LINUXLIVE partition.
+			# determine the uuid of the partition
+#			copygrub "LINUXLIVE" "${DISTRONAME}" "${UUID}"
 
 		elif test "${PARTNO}" -eq 2; then
 			# LINUXLIVE is ext4
@@ -268,18 +295,24 @@ installgrub () {
 			mount ${VERBOSE:+"-v"} -L EFILIVE /mnt/EFILIVE
 			exitonerror $? "Error could not mount /mnt/EFILIVE" "/mnt/EFILIVE"
 
-			# delete all links
-			find "/root/EFILIVE" -type l -exec rm ${VERBOSE:+"-v"} {} \;
-
-			# mv EFI and boot from cdrom in root
-			cp -a ${VERBOSE:+"-v"} /root/cdrom/EFI /mnt/EFILIVE
+			# copy cdrom/EFI and cdrom/boot to /mnt/EFILIVE
+			copyfiles "/root/cdrom/EFI" "/mnt/EFILIVE"
 			exitonerror $? "Error copying EFI to /mnt/EFILIVE" "/mnt/EFILIVE"
-			cp -a  ${VERBOSE:+"-v"} /root/cdrom/boot /mnt/EFILIVE
+
+			# make destination directories
+			mkdir "${VERBOSE:+"-v"}" "/mnt/EFILIVE/EFI"
+			exitonerror $? "Could not make directory /mnt/EFILIVE/EFI" "/mnt/EFILIVE"
+			mkdir "${VERBOSE:+"-v"}" "/mnt/EFILIVE/boot"
+			exitonerror $? "Could not make directory /mnt/EFILIVE/boot" "/mnt/EFILIVE"
+			copyfiles "/root/cdrom/boot" "/mnt/EFILIVE"
 			exitonerror $? "Error copying boot to /mnt/EFILIVE" "/mnt/EFILIVE"
-			
+
+			# copy grub.cfg to EFILIVE/boot/grub
+			copygrub "EFILIVE" "${DISTRONAME}" "${UUID}"
+
 			#umount EFILIVE
 			umountlabel "EFILIVE"
-			
+
 			# copy cdrom files excluding cdrom/EFI and cdrom/boot  to LINUXLIVE.
 			# EFI and boot reside on EFILIVE
 			copyfiles "/root/cdrom" "LINUXLIVE"
@@ -322,18 +355,21 @@ getdistroname () {
 	echo "${DISTRONAME}"
 }
 
-# function to copy grub.cfg to /root/cdrom/boot/grub/grub.cfg
-# parameters passed: 1 Flavour name version "Distro Name"
-#                    2 UUID of boot partition on the live system
+# function to backup grub.cfg to /root/cdrom/boot/grub/grub.cfg
+# create grub.cfg on boot partition /mnt/LABEL/boot/grub/grub.cfg
+# parameters passed: 1 LABEL of partition, EFILIVE or LINUXLIVE
+#                    2 Flavour name version "Distro Name"
+#                    3 UUID of boot partition on the live system
 # name is obtained from cdrom/.disk/info
 # this function works for both LINUXLIVE or EFILIVE
 copygrub() {
 	# backup original grub
-	# if -e ext4 chosen boot and EFI directories will be moved to /mnt/EFILIVE
-	mv ${VERBOSE:+"-v"} /root/cdrom/boot/grub/grub.cfg /root/cdrom/boot/grub/grub.cfg.original
+	# EFILIVE or LINUXLIVE must be mounted.
+	# boot directory must have been copied
+	mv ${VERBOSE:+"-v"} "/mnt/$1/boot/grub/grub.cfg" "/mnt/$1/boot/grub/grub.cfg.original"
 	exitonerror $? "Error moving grub.cfg to grub.cfg.original"
 
-	# create /root/cdrom/boot/grub/grub.cfg
+	# create /mnt/LABEL/boot/grub/grub.cfg
 echo "set timeout=30
 
 loadfont unicode
@@ -341,24 +377,24 @@ loadfont unicode
 set menu_color_normal=white/blue
 set menu_color_highlight=red/white
 
-menuentry \"Try $1\" {
+menuentry \"Try $2\" {
     set gfxpayload=keep
 
 	insmod part_gpt
 	insmod fat
 	insmod ext2
-	search --no-floppy --fs-uuid --set=root $2
+	search --no-floppy --fs-uuid --set=root $3
 
     linux  /casper/vmlinuz  --- username=robert hostname=live persistent persistent-path=/casper/ noprompt vt.cur_default=8
     initrd /casper/initrd
 }
-menuentry \"$1 (safe graphics)\" {
+menuentry \"$2 (safe graphics)\" {
     set gfxpayload=keep
 
 	insmod part_gpt
 	insmod fat
 	insmod ext2
-	search --no-floppy --fs-uuid --set=root $2
+	search --no-floppy --fs-uuid --set=root $3
     linux  /casper/vmlinuz nomodeset  --- quiet splash
     initrd /casper/initrd
 }
@@ -397,7 +433,7 @@ menuentry 'Boot from next volume' {
 menuentry 'UEFI Firmware Settings' {
     fwsetup
 }
-fi" > /root/cdrom/boot/grub/grub.cfg
+fi" > "/mnt/$1/boot/grub/grub.cfg"
 }
 
 ##################################################################################
@@ -427,17 +463,14 @@ copyfiles () {
 	mount ${VERBOSE:+"-v"} -L "$2" "/mnt/$2"
 	exitonerror "$?" "copyfiles: Could not mount $2 on /mnt/$2" "/mnt/$2"
 
-	# links cannot be copied to a fat32 filesystem
-	# delete all links
-	find "$1" -type l -exec rm ${VERBOSE:+"-v"} {} \;
-
-	# cp -dR -T /mnt/debhome/livesystem/MACRIUM /mnt/LINUXLIVE/
+	# print message
 	echo "copying $1 -> /mnt/$2"
 
 
-	cp -dR -T ${EXTRAVERBOSE:+"-v"} "$1" "/mnt/$2"
+#	cp -dR -T ${EXTRAVERBOSE:+"-v"} "$1" "/mnt/$2"
 	exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
 	# umount device which must be in fstab
+	echo "copyfiles: un mounting /mnt/$2"
 	umountlabel "$2"
 }
 
