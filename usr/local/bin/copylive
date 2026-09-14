@@ -493,14 +493,14 @@ copyfiles () {
 	exitonerror "$?" "copyfiles: Could not mount ${LABEL} on /mnt/${LABEL}" "/mnt/${LABEL}"
 
 	# make the directory if it does not exist
-	test -d "$2" || sudo -u "robert" mkdir ${VERBOSE:+"-v"} "$2"
+	test -d "$2" || mkdir -p ${VERBOSE:+"-v"} "$2"
 
 
 	# print message
 	echo "copying $1 -> $2"
 
 
-#	cp -dR -T ${EXTRAVERBOSE:+"-v"} "$1" "$2"
+	cp -dR -T ${EXTRAVERBOSE:+"-v"} "$1" "$2"
 	exitonerror $? "copyfiles: Could not copy $1 files to $2" "/mnt/${LABEL}"
 	# umount device which must be in fstab
 	echo "copyfiles: un mounting /mnt/${LABEL}"
