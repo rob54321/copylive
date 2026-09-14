@@ -42,11 +42,12 @@ getdevice () {
 	# call a perl function to get the LINUXLIVE device
 	# LINUXLIVE partition could be 1 (vfat) or 2 (ext4)
 	DEVICE=$(perl -e 'use strict; use warnings; do {
+										my $device = "none";
 										# get all devices
 										my @list = `lsblk -o PATH,LABEL`;
 										chomp(@list);
 										# for each item in list
-										foreach my $line (@list) {
+										OUTER: foreach my $line (@list) {
 											# if line contains LINUXLIVE get device path
 											if ($line =~ /LINUXLIVE/) {
 												# line = /dev/sda3    label
@@ -58,18 +59,26 @@ getdevice () {
 												$line =~ s/\d+.*$//;
 												# print the value
 												# so it is captured by DEVICE
-												print "$line";
+												$device = $line;
 												# exit the loop
-												last;
+
+												last OUTER;
 											}
 										}
+										# check if device found
+										if ($device eq "none") {
+											print "error";
+										} else {
+											print "$device";
+										}
 									}')
-	# if the device was found echo value
-	# else echo none
-	if test "${DEVICE}" != ""; then
-		echo "${DEVICE}"
+	# if the device was found echo value and return 0
+	# else return 1
+	echo "${DEVICE}"
+	if test "${DEVICE}" != "error"; then
+		return 0
 	else
-		echo "none"
+		return 10
 	fi
 }
 
@@ -82,19 +91,31 @@ getpnofromlabel() {
 	PARTN=$(perl -e 'use strict; use warnings;
 					my $device = shift;
 					my $label = shift;
+					my $partno = 0;
 					my @list = `lsblk $device -o LABEL,PARTN -n`;
 					chomp(@list);
 					# search for the label
-					for(my $i=1; $i<scalar(@list); $i++) {
+					OUTER: for(my $i=1; $i<scalar(@list); $i++) {
 						# get label and partition number from element
 						$list[$i] =~ /(\w+)\s+(\d+)/;
 						# check if label found
 						if ($label eq $1) {
 							# return partition no
-							print "$2";
-							
+							$partno = $2;
+							last OUTER;
 						}
-					}' "$1" "$2" )
+					}
+					print "$partno";' "$1" "$2" )
+	# check if partition no found
+	# if partition no = 0 not found
+	echo "${PARTN}"
+	if test "${PARTN}" -eq 0; then
+		# not found
+		return 10
+	else
+		# found
+		return 0
+	fi
 }
 ##########################################################################################
 # function to umount LABEL = $1 on /mnt/LABEL
@@ -106,8 +127,11 @@ getpnofromlabel() {
 umountlabel () {
 	# get the path of the LINUXLIVE, MACRIUM, MCTREC, writable
 	# all are on the same device.
-	DEVICE=`getdevice`
-
+	DEVICE=$(getdevice)
+	# check for errors
+	exitonerror "$?" "umountlabel: getdevice returned ${DEVICE} : could not find LINUXLIVE"
+	echo "${VERBOSE:+"umountlabel: device = ${DEVICE}"}"
+	
 	# set the partition number to be un mounted
 
 	# the partitions are numbered as follows:
@@ -120,14 +144,17 @@ umountlabel () {
 	# all are on the same device
 
 	# get partition number from the device and LABEL
-	getpnofromlabel "${DEVICE}" "$1"
+	echo "${EXTRAVERBOSE:+"calling getpnofromlabel: ${DEVICE} "$1"" } "
+	PARTNO=$(getpnofromlabel "${DEVICE}" "$1")
+	
 	# check for return of error
-	echo "${VERBOSE:+"umount device = ${DEVICE}: part no = ${PARTN}"}"
-	test "${PARTN}" = "error" && exitonerror 1 "Error unmounting ${DEVICE} from /mnt/$1"
+	exitonerror "$?" "getpnofromlabel: returned partition no = ${PARTNO}"
+	
+	echo "${EXTRAVERBOSE:+"getpnofromlabel: device;partno: ${DEVICE} ${PARTNO}"}"
 
-	echo "${VERBOSE:+"un mounted ${DEVICE}${PARTN} from /mnt/$1"}" 
-	PARTITION="${DEVICE}${PARTN}"
-exit
+	echo "${EXTRAVERBOSE:+"umountlabel: unmounting ${DEVICE}${PARTNO}"}" 
+	PARTITION="${DEVICE}${PARTNO}"
+
 	# get a list of mount points for the partition
 	# unmount all of them,
 	# the bash parameters are partition_no and true/null for verbose/quiet
@@ -144,7 +171,6 @@ exit
 						system("umount $list[$i]");
 					}
 				}' "${PARTITION}" "${VERBOSE}";)
-	echo "${RESULT}";
 }
 
 #############################################################################################
@@ -161,37 +187,37 @@ copyinitialise() {
 	umountlabel "writable"
 	# mount writable and copy initialise-linux
 	mount ${VERBOSE:+"-v"} -L writable /mnt/writable
-	exitonerror $? "Could not mount /mnt/writable" "/mnt/writable"
+	exitonerror $? "coypinitialise(): Could not mount /mnt/writable" "/mnt/writable"
 	mkdir ${VERBOSE:+"-v"} -p /mnt/writable/upper/root/
-	exitonerror $? "Could not make directory /mnt/writable/upper/root" "/mnt/writable"
+	exitonerror $? "copyinitialise(): Could not make directory /mnt/writable/upper/root" "/mnt/writable"
 	cp ${VERBOSE:+"-v"} /mnt/debhome/pool/myown/i/initialise-linux/*.deb /mnt/writable/upper/root/
-	exitonerror $? "Could not copy initialise-linux to /mnt/writable/upper/root/" "/mnt/writable"
+	exitonerror $? "copyinitialise(): Could not copy initialise-linux to /mnt/writable/upper/root/" "/mnt/writable"
 	umount ${VERBOSE:+"-v"} /mnt/writable
-	exitonerror $? "Could not umount /mnt/writable"
+	exitonerror $? "copyinitialise(): Could not umount /mnt/writable"
 }
 
 #########################################################################
-# function to find LINUXLIVE partition, 1 or 2 and return
-# the partition no and uuid of the partition
+# function to find partition no and uuid of LINUXLIVE partition, (1 or 2) and return
 # the uuid for ext4 must have the dashes
 # the uuid for vfat must not have any dashes
 # if LINUXLIVE is partition 1 , vfat then efi is in LINUXLIVE
 # if LINUXLIVE is partition 2 , ext4 then efi is on partition 1
 # parameters passed: device ie /dev/sda for example
 # parameter returned : partition number 1 or 2; uuid of partition
+# and a return code 0 or 10
 #########################################################################
 linuxlivedata() {
 	# much  easier in perl
 	# is partition 1 EFILIVE or LINUXLIVE
-	RESULT=$(perl -e 'use strict; use warnings;
+	PARTNOUUID=$(perl -e 'use strict; use warnings;
 					  my $device = shift;
-					  my $partno;
+					  # partno 0 indicates no was not found
+					  # non zero means partition no
+					  my $partno = 0;
 					  my $partname;
-					  my $uuid;
-					  # flag for LINUXLIVE partition found
-					  my $found = "false";
+					  my $uuid = 0;
 
-	                  my @list = `lsblk $device -n -o PARTN,LABEL,UUID`;
+	                  my @list = `lsblk $device -n -o PARTN,LABEL,UUID 2>/dev/null`;
 	                  # output format is:
 	                  # part_no part_name fs-uuid
 	                  chomp(@list);
@@ -200,30 +226,35 @@ linuxlivedata() {
 						  # find partition name in output
 						  # output = part_no  part_name     uuid
 						  $list[$i] =~ /(\d+)\s+(\w+)\s+([a-zA-Z0-9-]+)/;
-						  $partno = $1;
 						  $partname = $2;
-						  $uuid = $3;
 						  if ($2 eq "LINUXLIVE") {
 							  # found LINUXLIVE indicate found and leave loop
-							  $found = "true";
-							  last;
+							  $partno = $1;
+							  $uuid = $3;
 						  }
 					  }
-					  # if LINUXLIVE found return part-no,part-name,uuid
-					  # else return "error"
-					  if ($found eq "true") {
+					  # if LINUXLIVE found return part-no,uuid
+					  # else return partno = 0
+					  if ($partno != 0) {
 						  # if LINUXLIVE is partition 1 the uuid is of form 1111-1111
 						  # the dash must be removed. If it is partition 2 no change to uuid
 						  if ($partno == 1) {
 							  # remove the dash in the middle
 							  $uuid =~ s/-//g;
 						  }
-						  print "$partno $partname $uuid";
-					  } else {
-						  print "error";
 					  }
-	                  ' "$1")
-#	echo "${RESULT}"
+					  print "$partno $uuid";' "$1")
+	# return 0 on success, 10 otherse
+	PARTNO=`echo "${PARTNOUUID}" | cut -d " " -f1`
+	if test "${PARTNO}" -eq 0; then
+		# LINUXLIVE not found
+		echo "${PARTNOUUID}"
+		return 10
+	else
+		# LINUXLIVE found
+		echo "${PARTNOUUID}"
+		return 0
+	fi
 
 }
 
@@ -235,40 +266,39 @@ linuxlivedata() {
 installgrub () {
 	# if copy given as first parameter
 	# get device for grub install
-	DEVICE=`getdevice`
-	test "${DEVICE}" = "none" && exitonerror 1 "LINUXLIVE device could not be found: could not install grub"
+	DEVICE=$(getdevice)
+	# check for errors
+	exitonerror "$?" "installgrub: getdevice could not find LINUXLIVE"
+	echo "${EXTRAVERBOSE:+"getdevice returned device ${DEVICE}"}"
+	
 
 	# the device may be p1 LINUXLIVE vfat...
 	# or                p1 EFILIVE ; p2 LINUXLIVE ...
 	if test "$1" = "copy"; then
 		# copy initialise-linux from local repository to /mnt/writable/upper/root/
-#		copyinitialise
+		copyinitialise
 
 		# get distro name from /mnt/cdrom/.disk/info
 		# to be used by copygrub
 		DISTRONAME=`getdistroname`;
 
 		# echo distro name
-		echo "${VERBOSE:+"distro name: ${DISTRONAME}"}"
+		echo "${EXTRAVERBOSE:+"distro name: ${DISTRONAME}"}"
 
 		# determine if p1 is EFILIVE or LINUXLIVE
 		# and get the uuid
-		# returned string is LINUXLIVE 1111-1111
-		linuxlivedata "${DEVICE}"
-		# linuxlivedata returns part no, part name, uuid
-		# or "error" if the partition was not found
-		# the return is in RESULT
-		# exit on and error from linuxlivedata
-		test "${RESULT}" = "error" && exitonerror 1 "Error from linuxlivedata(): LINUXLIVE not found";
+		# returned string is partition no , uuid
+		# or 0 0  if it failed.
+		PARTNOUUID=$(linuxlivedata "${DEVICE}")
+		# check for errors
+		exitonerror "$?" "linuxlivedata: Could not find the LINUXLIVE parition returuned PARTNOUUID = ${PARTNOUUID}"
 		
 		# for verbose
-		echo "${VERBOSE:+"linuxlivedata: device = ${DEVICE}"}"
-		echo "${VERBOSE:+"linuxlivedata: part no; part name; uuid: ${RESULT}"}"
-		# separate partition no, partition name and uuid
-		PARTNO=`echo ${RESULT} | cut -d " " -f1`
-		PARTNAME=`echo ${RESULT} | cut -d " " -f2`
-		UUID=`echo ${RESULT} | cut -d " " -f3`
-		echo "${VERBOSE:+"part no ${PARTNO}; part name ${PARTNAME}; uuid ${UUID}"}"
+
+		# RESULT = partno uuid. separate them
+		PARTNO=`echo ${PARTNOUUID} | cut -d " " -f1`
+		UUID=`echo ${PARTNOUUID} | cut -d " " -f2`
+		echo "${EXTRAVERBOSE:+"linuxlivedata returned partno = ${PARTNO}: uuid = ${UUID}"}"
 
 		# if LINUXLIVE is partition 1 it is vfat
 		# if LINUXLIVE is partition 2 it is ext4
@@ -276,38 +306,35 @@ installgrub () {
 			# LINUXLIVE is vfat
 			# links cannot be copied to a fat32 filesystem
 
-			# delete all links
-			find "/root/cdrom" -type l -exec rm ${VERBOSE:+"-v"} {} \;
-
 			# copy all cdrom files into LINUXLIVE
-			copyfiles "/root/cdrom" "LINUXLIVE"
+			copyfiles "/root/cdrom" "/mnt/LINUXLIVE"
 
 			# copy grub.cfg to /root/cdrom/boot/grub.cfg
 			# set the uuid of the boot partition on the live system by reading it from the partition
 			# uuid is different for vfat and ext4 LINUXLIVE partition.
 			# determine the uuid of the partition
-#			copygrub "LINUXLIVE" "${DISTRONAME}" "${UUID}"
+			# LINUXLIVE must be mounted
+			mount ${VERBOSE:+"-v"} -L "LINUXLIVE" "/mnt/LINUXLIVE"
+			exitonerror "$?" "installgrub: Error: Could not mount /mnt/LINUXLIVE"
+
+			copygrub "LINUXLIVE" "${DISTRONAME}" "${UUID}"
+			umountlabel "LINUXLIVE"
 
 		elif test "${PARTNO}" -eq 2; then
 			# LINUXLIVE is ext4
 			#cdrom/EFI and cdrom/boot must be copied  to /mnt/EFILIVE
-			umountlabel "EFILIVE"
-			mount ${VERBOSE:+"-v"} -L EFILIVE /mnt/EFILIVE
-			exitonerror $? "Error could not mount /mnt/EFILIVE" "/mnt/EFILIVE"
 
 			# copy cdrom/EFI and cdrom/boot to /mnt/EFILIVE
-			copyfiles "/root/cdrom/EFI" "/mnt/EFILIVE"
+			copyfiles "/root/cdrom/EFI" "/mnt/EFILIVE/EFI"
 			exitonerror $? "Error copying EFI to /mnt/EFILIVE" "/mnt/EFILIVE"
-
-			# make destination directories
-			mkdir "${VERBOSE:+"-v"}" "/mnt/EFILIVE/EFI"
-			exitonerror $? "Could not make directory /mnt/EFILIVE/EFI" "/mnt/EFILIVE"
-			mkdir "${VERBOSE:+"-v"}" "/mnt/EFILIVE/boot"
-			exitonerror $? "Could not make directory /mnt/EFILIVE/boot" "/mnt/EFILIVE"
-			copyfiles "/root/cdrom/boot" "/mnt/EFILIVE"
+			copyfiles "/root/cdrom/boot" "/mnt/EFILIVE/boot"
 			exitonerror $? "Error copying boot to /mnt/EFILIVE" "/mnt/EFILIVE"
 
+			mount ${VERBOSE:+"-v"} -L "EFILIVE" "/mnt/EFILIVE"
+			exitonerror $? "Error could not mount /mnt/EFILIVE" "/mnt/EFILIVE"
+
 			# copy grub.cfg to EFILIVE/boot/grub
+			echo "${VERBOSE:+"installgrub: Calling copygrub EFILIVE ${DISTRONAME} ${UUID}"}"
 			copygrub "EFILIVE" "${DISTRONAME}" "${UUID}"
 
 			#umount EFILIVE
@@ -315,7 +342,8 @@ installgrub () {
 
 			# copy cdrom files excluding cdrom/EFI and cdrom/boot  to LINUXLIVE.
 			# EFI and boot reside on EFILIVE
-			copyfiles "/root/cdrom" "LINUXLIVE"
+			# do not copy /root/cdrom/EFI and /root/cdrom/boot to LINUXLIVE
+			copyfiles "/root/cdrom" "/mnt/LINUXLIVE"
 		fi
 	fi
 
@@ -441,7 +469,8 @@ fi" > "/mnt/$1/boot/grub/grub.cfg"
 # LINUXLIVE files to the hard disk. Partitions are mounted
 # and unmounted.
 # parameters passed 1. full source path
-#                   2. LABEL of partition
+#                   2. destination directory eg /mnt/EFILIVE/EFI
+#                   form is: /mnt/LABEL/target_directory
 ##################################################################################
 copyfiles () {
 	# umounts device
@@ -454,24 +483,28 @@ copyfiles () {
 	# parameters passed:
 	# 1 full source path
 	# 2 label MACRIUM or MCTREC or LINUXLIVE/EFILIVE for file type
-
-	# make the mount directory if it does not exist
-	test -d "/mnt/$2" || sudo -u "robert" mkdir ${VERBOSE:+"-v"} "/mnt/$2"
+	# get the label
+	# destination is of form /mnt/LABEL/target_directory
+	LABEL=$(echo "$2" | cut -d "/" -f3)
 
 	# mount LABEL if not already mounted
-	umountlabel "$2"
-	mount ${VERBOSE:+"-v"} -L "$2" "/mnt/$2"
-	exitonerror "$?" "copyfiles: Could not mount $2 on /mnt/$2" "/mnt/$2"
+	umountlabel "${LABEL}"
+	mount ${VERBOSE:+"-v"} -L "${LABEL}" "/mnt/${LABEL}"
+	exitonerror "$?" "copyfiles: Could not mount ${LABEL} on /mnt/${LABEL}" "/mnt/${LABEL}"
+
+	# make the directory if it does not exist
+	test -d "$2" || sudo -u "robert" mkdir ${VERBOSE:+"-v"} "$2"
+
 
 	# print message
-	echo "copying $1 -> /mnt/$2"
+	echo "copying $1 -> $2"
 
 
-#	cp -dR -T ${EXTRAVERBOSE:+"-v"} "$1" "/mnt/$2"
-	exitonerror $? "Could not copy $1 files to /mnt/$2" "/mnt/$2"
+#	cp -dR -T ${EXTRAVERBOSE:+"-v"} "$1" "$2"
+	exitonerror $? "copyfiles: Could not copy $1 files to $2" "/mnt/${LABEL}"
 	# umount device which must be in fstab
-	echo "copyfiles: un mounting /mnt/$2"
-	umountlabel "$2"
+	echo "copyfiles: un mounting /mnt/${LABEL}"
+	umountlabel "${LABEL}"
 }
 
 ##################################################################
@@ -505,12 +538,16 @@ mountcopypermissions() {
 	echo "copying /mnt/cdrom -> /root"
 	cp -dR ${EXTRAVERBOSE:+"-v"} /mnt/cdrom /root/
 	exitonerror $? "Error copying files from /mnt/cdrom to /root/cdrom" "/mnt/cdrom"
+
 	# set file and directory permissions
 	find /root/cdrom -type f -exec chmod a+w {} \;
 	find /root/cdrom -type d -exec chmod 755 {} \;
 
 	umount ${VERBOSE:+"-v"} "/mnt/cdrom"
 	exitonerror $? "Could not umount iso image $1 from /mnt/cdrom"
+
+	# delete all links, they cannot be copied to a vfat fs.
+	find "/root/cdrom" -type l -exec rm ${VERBOSE:+"-v"} {} \;
 }
 
 # usage function
@@ -595,8 +632,13 @@ do
 	esac
 done
 
-# testing
-# echo "${ISOIMAGE}: ${PARTDISK}, ${LLIVESIZE}, ${WSIZE} , ${MCTSIZE}";
+#########################################################################
+# for testing, until the exit
+#######################################################################
+
+########################################################################
+# end of testing
+########################################################################
 
 # if -p or -D or -W or -M or -e or -f given , partition the disk
 # for partitioning one of -e or -f must be given.
@@ -635,10 +677,10 @@ if test "${ISOIMAGE}" != "none"; then
 fi
 
 # copy files for MACRIUM if -m given
-test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "MACRIUM"
+test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "/mnt/MACRIUM"
 
 # for mctrec if -t given
-test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "MCTREC"
+test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "/mnt/MCTREC"
 
 # install grub to the correct device
 # -i install and copies cdrom  EFI files
