@@ -307,7 +307,8 @@ installgrub () {
 			# links cannot be copied to a fat32 filesystem
 
 			# copy all cdrom files into LINUXLIVE
-			copyfiles "/root/cdrom" "/mnt/LINUXLIVE"
+			# source appended by / so files are copied not containing directory
+			copyfiles "/root/cdrom/" "/mnt/LINUXLIVE"
 
 			# copy grub.cfg to /root/cdrom/boot/grub.cfg
 			# set the uuid of the boot partition on the live system by reading it from the partition
@@ -325,9 +326,10 @@ installgrub () {
 			#cdrom/EFI and cdrom/boot must be copied  to /mnt/EFILIVE
 
 			# copy cdrom/EFI and cdrom/boot to /mnt/EFILIVE
-			copyfiles "/root/cdrom/EFI" "/mnt/EFILIVE/EFI"
+			# source not appended by /, EFI and boot dirs must be copied
+			copyfiles "/root/cdrom/EFI" "/mnt/EFILIVE"
 			exitonerror $? "Error copying EFI to /mnt/EFILIVE" "/mnt/EFILIVE"
-			copyfiles "/root/cdrom/boot" "/mnt/EFILIVE/boot"
+			copyfiles "/root/cdrom/boot" "/mnt/EFILIVE"
 			exitonerror $? "Error copying boot to /mnt/EFILIVE" "/mnt/EFILIVE"
 
 			mount ${VERBOSE:+"-v"} -L "EFILIVE" "/mnt/EFILIVE"
@@ -343,7 +345,9 @@ installgrub () {
 			# copy cdrom files excluding cdrom/EFI and cdrom/boot  to LINUXLIVE.
 			# EFI and boot reside on EFILIVE
 			# do not copy /root/cdrom/EFI and /root/cdrom/boot to LINUXLIVE
-			copyfiles "/root/cdrom" "/mnt/LINUXLIVE"
+			# the exclude option is only for this case , copying to LINUXLIVE ext4.
+			# source must be appended by / so parent dir not copied
+			copyfiles "/root/cdrom/" "/mnt/LINUXLIVE" "exclude"
 		fi
 	fi
 
@@ -468,8 +472,9 @@ fi" > "/mnt/$1/boot/grub/grub.cfg"
 # function to copy MCTREC, MACRIUM and
 # LINUXLIVE files to the hard disk. Partitions are mounted
 # and unmounted.
-# parameters passed 1. full source path
-#                   2. destination directory eg /mnt/EFILIVE/EFI
+# parameters passed 1. full source path, source must be appended by / so files are copied not directory
+#                   2. destination root directory eg /mnt/EFILIVE/
+#                   3. optional "exclude" exlude boot and EFI directories to LINUXLIVE
 #                   form is: /mnt/LABEL/target_directory
 ##################################################################################
 copyfiles () {
@@ -499,8 +504,17 @@ copyfiles () {
 	# print message
 	echo "copying $1 -> $2"
 
-
-	cp -dR -T ${EXTRAVERBOSE:+"-v"} "$1" "$2"
+	# try rsync for copying so directories can be excluded
+	# rsync -zr cdrom/ /mnt/destination copies files in cdrom to destination
+	# rsync -zr cdrom /mnt/destination copies to /mnt/destination/cdrom
+	if test "${3}" = "exclude"; then
+		# copying cdrom/ -> /mnt/LINUXLIVE (ext4)
+		rsync -rz --no-links --mkpath --exclude='boot/' --exclude='EFI/' "${1}" "${2}"
+	else
+		# copying /root/cdrom/ /mnt/LINUXLIVE (vfat)
+		rsync -rz --mkpath --no-links "${1}" "${2}"
+	fi
+#	cp -dR -T ${EXTRAVERBOSE:+"-v"} "$1" "$2"
 	exitonerror $? "copyfiles: Could not copy $1 files to $2" "/mnt/${LABEL}"
 	# umount device which must be in fstab
 	echo "copyfiles: un mounting /mnt/${LABEL}"
@@ -677,10 +691,10 @@ if test "${ISOIMAGE}" != "none"; then
 fi
 
 # copy files for MACRIUM if -m given
-test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM" "/mnt/MACRIUM"
+test "${CPMACRIUM}" = "true" && copyfiles "${MSOURCE}/MACRIUM/" "/mnt/MACRIUM"
 
 # for mctrec if -t given
-test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC" "/mnt/MCTREC"
+test "${CPMCTREC}" = "true" && copyfiles "${MSOURCE}/MCTREC/" "/mnt/MCTREC"
 
 # install grub to the correct device
 # -i install and copies cdrom  EFI files
