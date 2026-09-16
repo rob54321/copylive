@@ -235,14 +235,6 @@ linuxlivedata() {
 					  }
 					  # if LINUXLIVE found return part-no,uuid
 					  # else return partno = 0
-					  if ($partno != 0) {
-						  # if LINUXLIVE is partition 1 the uuid is of form 1111-1111
-						  # the dash must be removed. If it is partition 2 no change to uuid
-						  if ($partno == 1) {
-							  # remove the dash in the middle
-							  $uuid =~ s/-//g;
-						  }
-					  }
 					  print "$partno $uuid";' "$1")
 	# return 0 on success, 10 otherse
 	PARTNO=`echo "${PARTNOUUID}" | cut -d " " -f1`
