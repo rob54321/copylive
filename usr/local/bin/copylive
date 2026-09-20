@@ -545,6 +545,7 @@ echo "getting device"
 			"MACRIUM")   mkfs.vfat ${VERBOSE:+"-v"} -n "MACRIUM" -i "${MACRIUMUUID}" "${DEVICE}${PARTN}";;
 			"MCTREC")    mkfs.vfat ${VERBOSE:+"-v"} -n "MCTREC" -i "${MCTRECUUID}" "${DEVICE}${PARTN}";;
 			"data")      mkfs.ntfs ${VERBOSE:+"-v"} -L "data" -Q "${DEVICE}${PARTN}";;
+			"writable")  mkfs.ext4 ${VERBOSE:+"-v"} -L "writable" -j -F "${DEVICE}${PARTN}";;
 			"LINUXLIVE") 	# partition 1 will be vfat with uuid
 							# partition 2 will be ext4 with uud
 							if test "${PARTN}" -eq 2; then
