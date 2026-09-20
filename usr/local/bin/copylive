@@ -67,7 +67,7 @@ getdevice () {
 										}
 										# check if device found
 										if ($device eq "none") {
-											print "error";
+											print "error: LINUXLIVE not found";
 										} else {
 											print "$device";
 										}
@@ -129,9 +129,9 @@ umountlabel () {
 	# all are on the same device.
 	DEVICE=$(getdevice)
 	# check for errors
-	exitonerror "$?" "umountlabel: getdevice returned ${DEVICE} : could not find LINUXLIVE"
-	echo "${VERBOSE:+"umountlabel: device = ${DEVICE}"}"
-	
+	exitonerror "$?" "umountlabel: getdevice returned ${DEVICE} : could not find ${1}"
+	echo "${VERBOSE:+"umountlabel: label = ${1} ; device = ${DEVICE}"}"
+
 	# set the partition number to be un mounted
 
 	# the partitions are numbered as follows:
@@ -513,6 +513,75 @@ copyfiles () {
 	umountlabel "${LABEL}"
 }
 
+
+##################################################################
+# function to format a list of partitions
+# parameters passed: list of partitions to be formated
+# the LINUXLIVE disk must be available.
+# return status :  success = 0
+#                  failure = non zero
+#################################################################
+formatpartitions() {
+	# get the device of LINUXLIVE
+echo "getting device"
+	DEVICE=$(getdevice)	
+	exitonerror "$?" "getdevice() returned an error"
+
+	# the device is now DEVICE.
+	# get the partition number from the label
+	# $1 contains the list of partitions
+	for label in $(echo "${1}"); do
+		# get the partition number
+		PARTN=$(getpnofromlabel "${DEVICE}" "${label}")
+		exitonerror "$?" "formatpartitions: Could not fine partition ${label}"
+		echo "formatpartitions: label ${label} on ${DEVICE}${PARTN}"
+		
+		# umount the partition
+		umountlabel "${label}"
+		
+		# format the partion. The fs and uuid depend on the partition
+		case "${label}" in
+			"EFILIVE")   mkfs.vfat ${VERBOSE:+"-v"} -n "EFILIVE" "${DEVICE}${PARTN}";;
+			"MACRIUM")   mkfs.vfat ${VERBOSE:+"-v"} -n "MACRIUM" -i "${MACRIUMUUID}" "${DEVICE}${PARTN}";;
+			"MCTREC")    mkfs.vfat ${VERBOSE:+"-v"} -n "MCTREC" -i "${MCTRECUUID}" "${DEVICE}${PARTN}";;
+			"data")      mkfs.ntfs ${VERBOSE:+"-v"} -L "data" -Q "${DEVICE}${PARTN}";;
+			"LINUXLIVE") 	# partition 1 will be vfat with uuid
+							# partition 2 will be ext4 with uud
+							if test "${PARTN}" -eq 2; then
+								# ext4
+								# use UUID if it was given on the command line
+								# else use the default LINUXLIVEUUID
+								if test "${UUID}" = "0"; then
+									# no uuid given use default
+									mkfs.ext4 -j -L LINUXLIVE ${VERBOSE:+"-v"} -F -U "${LINUXLIVEUUID}" "${DEVICE}${PARTN}"
+									exitonerror "$?" "formatpartitions: Error formatting ${label} ${DEVICE}${PARTN}"
+								else
+									# use the given UUID
+									mkfs.ext4 -j -L LINUXLIVE ${VERBOSE:+"-v"} -F -U "${UUID}" "${DEVICE}${PARTN}"
+									exitonerror "$?" "formatpartitions: Error formatting ${label} ${DEVICE}${PARTN}"
+								fi
+							elif test "${PARTN}" -eq 1; then
+								# vfat
+								# use UUID if it was given on the command line
+								# else use the default LINUXLIVEUUID
+								if test "${UUID}" = "0"; then
+									# no uuid given use default
+									mkfs.vfat -n LINUXLIVE ${VERBOSE:+"-v"} -i "${LINUXLIVEVOLID}" "${DEVICE}${PARTN}"
+									exitonerror "$?" "formatpartitions: Error formatting ${label} ${DEVICE}${PARTN}"
+								else
+									# use the given UUID
+									mkfs.vfat -n LINUXLIVE ${VERBOSE:+"-v"} -i "${UUID}" "${DEVICE}${PARTN}"
+									exitonerror "$?" "formatpartitions: Error formatting ${label} ${DEVICE}${PARTN}"
+								fi
+							else
+								# the partition no is not 1 or 2.
+								# this is an error
+								exitonerror 1 "formatpartitions: LINUXLIVE partition no is not 1 or 2: ${PARTN}"
+							fi;;
+			*)        exitonerror 1 "formatpartitions: ${label} is an unknown partition";;
+		esac
+	done
+}
 ##################################################################
 # function to mount cdrom, copy files
 # to /root/cdrom and set the file permissions
@@ -561,6 +630,7 @@ usage() {
 	echo "-c isoimage : create /root/cdrom with iso image";
 	echo "-i install grub and copy cdrom files to LINUXLIVE and copy initialise-linux to /mnt/writable/upper/root/"
 	echo "-I install grub only"
+	echo "-F [\"label1 label2 ..\"] format the partitions from the list -e or -f override -F"
 	echo "-U uuid / volume id of LINUXLIVE partition"
 	echo "	ext4 default ${LINUXLIVEUUID}"
 	echo "	vfat default ${LINUXLIVEVOLID}"
@@ -590,7 +660,10 @@ LLIVESIZE=8;
 WSIZE=10;
 MCTSIZE=8;
 MASIZE=2;
+FLIST=""
+
 # default values for switches
+FORMAT="false"
 ISOIMAGE="none"
 CPMACRIUM="false"
 CPMCTREC="false"
@@ -612,16 +685,23 @@ LINUXLIVEUUID="12345678-1234-1234-1234-123456789012"
 #volume id for LINUXLIVE partition p1
 LINUXLIVEVOLID="11111111"
 
+# uuid for macrium
+MACRIUMUUID=AED6434E
+
+# uuid for MCTREC
+MCTRECUUID=44444444
+
 # source path for MACRIUM and MCTREC files.
 MSOURCE="/mnt/debhome/livesystem"
 
-while getopts efiU:Ic:D:W:M:L:T:mtvVh opt
+while getopts F:efiU:Ic:D:W:M:L:T:mtvVh opt
 do
 	case ${opt} in
+		F) FORMAT="true"; FLIST="${OPTARG}";;
 		f) VFATOPTION="true"; PARTDISK="true";;
 		e) EXT4OPTION="true"; PARTDISK="true";;
 		I) INSTALLGRUB="true";;
-		U) UUID="${OPTARG}"; PARTDISK="true";;
+		U) UUID="${OPTARG}";;
 		E) EFISIZE="${OPTARG}";;
 		i) INSTALLGRUBCOPY="true";;
 		c) ISOIMAGE="${OPTARG}";;
@@ -649,6 +729,13 @@ done
 # if -p or -D or -W or -M or -e or -f given , partition the disk
 # for partitioning one of -e or -f must be given.
 if test "${PARTDISK}" = "true"; then
+	# if -F given to format set it to false
+	if test "${FORMAT}" = "true"; then
+		FORMAT="false"
+		# echo an error message
+		echo "-e and -f override -F"
+	fi
+
 	# check if -e given
 	if test "${EXT4OPTION}" = "true"; then
 		# partition with ext4 option
@@ -668,6 +755,13 @@ if test "${PARTDISK}" = "true"; then
 		# neither -e nor -f was given
 		echo "Neither -e nor -f was given: cannot partition the disk"
 	fi
+fi
+
+# format the partitions if necessary
+if test "${FORMAT}" = "true"; then
+	# Flist contains the list of labels.
+	# the disk with LINUXLIVE must be available
+	formatpartitions "${FLIST}"
 fi
 
 # if -c given, create /root/cdrom else /root/cdrom must already exist
