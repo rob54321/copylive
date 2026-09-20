@@ -531,13 +531,13 @@ echo "getting device"
 	# get the partition number from the label
 	# $1 contains the list of partitions
 	for label in $(echo "${1}"); do
+		# umount the partition
+		umountlabel "${label}"
+		
 		# get the partition number
 		PARTN=$(getpnofromlabel "${DEVICE}" "${label}")
 		exitonerror "$?" "formatpartitions: Could not fine partition ${label}"
 		echo "formatpartitions: label ${label} on ${DEVICE}${PARTN}"
-		
-		# umount the partition
-		umountlabel "${label}"
 		
 		# format the partion. The fs and uuid depend on the partition
 		case "${label}" in
@@ -545,7 +545,7 @@ echo "getting device"
 			"MACRIUM")   mkfs.vfat ${VERBOSE:+"-v"} -n "MACRIUM" -i "${MACRIUMUUID}" "${DEVICE}${PARTN}";;
 			"MCTREC")    mkfs.vfat ${VERBOSE:+"-v"} -n "MCTREC" -i "${MCTRECUUID}" "${DEVICE}${PARTN}";;
 			"data")      mkfs.ntfs ${VERBOSE:+"-v"} -L "data" -Q "${DEVICE}${PARTN}";;
-			"writable")  mkfs.ext4 ${VERBOSE:+"-v"} -L "writable" -j -F "${DEVICE}${PARTN}";;
+			"writable")  mkfs.ext4 ${VERBOSE:+"-v"} -L "writable" -j -F "${DEVICE}${PARTN}"; copyinitialise;;
 			"LINUXLIVE") 	# partition 1 will be vfat with uuid
 							# partition 2 will be ext4 with uud
 							if test "${PARTN}" -eq 2; then
