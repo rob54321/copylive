@@ -146,10 +146,10 @@ umountlabel () {
 	# get partition number from the device and LABEL
 	echo "${EXTRAVERBOSE:+"calling getpnofromlabel: ${DEVICE} "$1"" } "
 	PARTNO=$(getpnofromlabel "${DEVICE}" "$1")
-	
+
 	# check for return of error
 	exitonerror "$?" "getpnofromlabel: returned partition no = ${PARTNO}"
-	
+
 	echo "${EXTRAVERBOSE:+"getpnofromlabel: device;partno: ${DEVICE} ${PARTNO}"}"
 
 	echo "${EXTRAVERBOSE:+"umountlabel: unmounting ${DEVICE}${PARTNO}"}" 
@@ -262,7 +262,7 @@ installgrub () {
 	# check for errors
 	exitonerror "$?" "installgrub: getdevice could not find LINUXLIVE"
 	echo "${EXTRAVERBOSE:+"getdevice returned device ${DEVICE}"}"
-	
+
 
 	# the device may be p1 LINUXLIVE vfat...
 	# or                p1 EFILIVE ; p2 LINUXLIVE ...
@@ -284,7 +284,7 @@ installgrub () {
 		PARTNOUUID=$(linuxlivedata "${DEVICE}")
 		# check for errors
 		exitonerror "$?" "linuxlivedata: Could not find the LINUXLIVE parition returuned PARTNOUUID = ${PARTNOUUID}"
-		
+
 		# for verbose
 
 		# RESULT = partno uuid. separate them
@@ -347,7 +347,7 @@ installgrub () {
 	# install grub
 	# TESTING
 	echo "install-grub ${VERBOSE:+"-v"} on ${DEVICE}"
-	
+
 	# only install grub on amd64
 	ARCH=`arch`
 	if test "${ARCH}" = "x86_64"; then
@@ -524,7 +524,7 @@ copyfiles () {
 formatpartitions() {
 	# get the device of LINUXLIVE
 echo "getting device"
-	DEVICE=$(getdevice)	
+	DEVICE=$(getdevice)
 	exitonerror "$?" "getdevice() returned an error"
 
 	# the device is now DEVICE.
@@ -533,12 +533,12 @@ echo "getting device"
 	for label in $(echo "${1}"); do
 		# umount the partition
 		umountlabel "${label}"
-		
+
 		# get the partition number
 		PARTN=$(getpnofromlabel "${DEVICE}" "${label}")
 		exitonerror "$?" "formatpartitions: Could not fine partition ${label}"
 		echo "formatpartitions: label ${label} on ${DEVICE}${PARTN}"
-		
+
 		# format the partion. The fs and uuid depend on the partition
 		case "${label}" in
 			"EFILIVE")   mkfs.vfat ${VERBOSE:+"-v"} -n "EFILIVE" "${DEVICE}${PARTN}";;
