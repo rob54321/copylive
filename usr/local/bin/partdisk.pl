@@ -12,6 +12,7 @@ use strict;
 use warnings;
 use Getopt::Std;
 
+# these are global symbols to the file.
 our ($opt_e, $opt_f, $opt_v, $opt_h, $opt_U, $opt_E, $opt_L, $opt_T, $opt_W, $opt_M);
 
 # default sizes for the paritions
