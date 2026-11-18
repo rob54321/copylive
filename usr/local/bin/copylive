@@ -39,6 +39,7 @@ exitonerror() {
 # function
 # parameters passed: none
 #############################################################################
+
 getdevice () {
 	# call a perl function to get the LINUXLIVE device
 	# LINUXLIVE partition could be 1 (vfat) or 2 (ext4)
