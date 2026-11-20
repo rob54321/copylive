@@ -51,7 +51,7 @@ sub usage {
 ######################################################
 sub getsize {
 	# parameter
-	my $device = shift @_;
+	my ($device) = @_;
 
 	# get size
 	my @list = `lsblk $device -o SIZE`;
@@ -81,11 +81,11 @@ sub getsize {
 # sub aborts on any error
 # requires: disk for MACRIUM to be attached, not mounted
 ######################################################
+
+## no critic (Subroutines::RequireArgUnpacking)
 sub partitiondisk {
-	# get uuid and size of partitions
+	# get parameters passed
 	my $linuxliveuuid = shift @_;
-	
-	# for the vfat case efisize = ""
 	my $efisize = shift @_;
 	my $linuxlivesize = shift @_;
 	my $writablesize = shift @_;
@@ -102,7 +102,7 @@ sub partitiondisk {
 	# get the device
 	print "\n\nenter device to be formatted: form /dev/sdX\n";
 
-	my $device = <STDIN>;
+	my $device = <>;
 	chomp($device);
 
 	# get the disk size
@@ -128,7 +128,7 @@ sub partitiondisk {
 		print "\n\nThe disk will be partitioned as follows:\n\n";
 		print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\np1: EFI fat32 parition = $efisize GB\np2: LINUXLIVE ext4 partition = $linuxlivesize GB uuid = $linuxliveuuid\np3: writable ext4 partition = $writablesize GB\np4: MACRIUM fat32 partion = $macriumsize GB\np5: MCTREC fat32 partition = $mctrecsize GB\np6: data ntfs partition = $datasize GB\n";
 		print "\n\nAll data on $device will be deleted: is this correct (yes|no)?\n";
-		my $answer = <STDIN>;
+		my $answer = <>;
 		chomp($answer);
 
 		if ($answer =~ /^yes$/i) {
@@ -241,7 +241,7 @@ sub partitiondisk {
 		print "\n\nThe disk will be partitioned as follows:\n\n";
 		print "Model = $model[1]\nDevice = $device\nDisk size = $devicesize GB\np1: LINUXLIVE fat32 partition = $linuxlivesize GB\np2: writable ext4 partition = $writablesize GB\np3: MACRIUM fat32 partion = $macriumsize GB\np4: MCTREC fat32 partition = $mctrecsize GB\np5: data ntfs partition = $datasize GB\n";
 		print "\n\nAll data on $device will be deleted: is this correct (yes|no)?\n";
-		my $answer = <STDIN>;
+		my $answer = <>;
 		chomp($answer);
 
 		if ($answer =~ /^yes$/i) {
@@ -334,7 +334,8 @@ sub partitiondisk {
 			exit 1;
 		}
 
-	}	
+	}
+	return;
 }
 
 ###############################
